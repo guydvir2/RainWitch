@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Rain Watch</title>
+<title>Rain Witch</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -43,7 +43,7 @@ button,input,select{font:inherit;color:inherit}
 /* top bar */
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;padding-block:14px}
 .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
-.brand svg{width:26px;height:26px;flex:none}
+.brand svg{width:44px;height:36px;flex:none}
 .brand b{font-size:1.1rem;letter-spacing:-.01em}
 .brand small{display:block;color:var(--muted);font-size:.75rem;font-family:var(--mono)}
 .tabs{display:inline-flex;gap:2px;border-bottom:2px solid var(--line)}
@@ -210,6 +210,21 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
 .pin-home{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--home);border:3px solid #fff;box-shadow:0 1px 4px rgb(0 0 0 / .4)}
 .pin-wrap{cursor:grab}
 
+/* human / geek */
+body:not(.geek) .geek-only{display:none !important}
+body:not(.geek) .gsum span:nth-child(n+2){display:none}
+body:not(.geek) .mapwrap{height:calc(100dvh - var(--dock,70px) - 84px);min-height:380px;margin-top:6px}
+.tog{display:flex;align-items:center;gap:12px;cursor:pointer;flex-wrap:wrap}
+.tog input{position:absolute;opacity:0;width:1px;height:1px}
+.tog .tl{display:flex;flex-direction:column;line-height:1.2} .tog .tl i{font-style:normal;font-size:.75rem;color:var(--muted)}
+.tog .sw{width:46px;height:26px;border-radius:999px;background:var(--line);position:relative;flex:none;transition:background .15s}
+.tog .sw::after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / .35);transition:transform .15s}
+.tog input:checked ~ .sw{background:var(--accent)} .tog input:checked ~ .sw::after{transform:translateX(20px)}
+.tog input:focus-visible ~ .sw{outline:2px solid var(--accent);outline-offset:2px}
+.seg button svg,.btn svg{display:block;width:18px;height:18px}
+.seg button.ic{padding:6px 14px}
+.btn.ic{padding:7px 10px;display:inline-flex}
+
 @media (max-width:860px){
   .cards,.sgrid{grid-template-columns:minmax(0,1fr)}
   .combo{grid-template-columns:minmax(0,1fr)}
@@ -239,8 +254,8 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
 <div class="wrap">
 <header class="top">
   <div class="brand">
-    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 20a6 6 0 0 1 .6-12A8 8 0 0 1 25 10a5 5 0 0 1-1 10z" fill="var(--accent)"/><path d="M11 24l-1.5 4M17 24l-1.5 4M23 24l-1.5 4" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/></svg>
-    <div><b>Rain Watch <span style="font:500 .65rem var(--mono);color:var(--muted)">v11.2</span></b><small id="stamp">Loading…</small></div>
+    <svg viewBox="-2 -3 46 37" aria-hidden="true"><path d="M3 29 L40 16" stroke="#6b4a1e" stroke-width="2.4" stroke-linecap="round"/><path d="M7 27.6 L-1 22.5 L-1 33 Z" fill="#c9962f"/><path d="M5 27.6 L-1 27.8" stroke="#8a6416" stroke-width=".9"/><path d="M19 22 Q11 20 7 25 Q15 25.5 20 25 Z" fill="var(--accent)" opacity=".55"/><path d="M19 23 Q20 13 27 12.5 Q31 17 30 21.5 Z" fill="#3b2a6b"/><circle cx="28.6" cy="9" r="3" fill="#f1c9a5"/><path d="M24.2 8.6 L30.2 -1.5 L33.6 8.6 Z" fill="#241b3d"/><ellipse cx="28.8" cy="8.7" rx="6.6" ry="1.4" fill="#241b3d"/><path d="M25 22 L31 19.8 L32 23" stroke="#241b3d" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div><b>Rain Witch <span style="font:500 .65rem var(--mono);color:var(--muted)">v0.2</span></b><small id="stamp">Loading…</small></div>
   </div>
   <button id="refresh" type="button" class="btn">Refresh</button>
   <button id="menuBtn" type="button" class="menu" aria-label="Settings" aria-expanded="false"><span></span><span></span><span></span></button>
@@ -250,13 +265,13 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
 
 <!-- DATA TAB -->
 <section id="view-data">
-  <section class="panel" aria-label="Outlook and rain chance">
+  <section class="panel geek-only" aria-label="Outlook and rain chance">
     <div class="ph">
       <h2 id="olTitle">Next 3 hours · Here</h2>
       <div class="ctrls">
         <div class="seg sm" role="group" aria-label="Outlook scope">
           <button type="button" data-scope="point" aria-pressed="true" id="scPoint">At Here</button>
-          <button type="button" data-scope="area" aria-pressed="false" id="scArea">20 km around</button>
+          <button type="button" data-scope="area" aria-pressed="false" id="scArea">10 km around</button>
         </div>
         <label for="hoursSel">Next
           <select id="hoursSel"><option value="1">1 h</option><option value="3">3 h</option><option value="6">6 h</option><option value="12">12 h</option><option value="24">24 h</option></select>
@@ -290,7 +305,6 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
         <div class="ro-kv">
           <span>Rain in these 15 min</span><span id="roMm">--</span>
           <span id="roAccL">Total since 00:00</span><span id="roAcc">--</span>
-          <span>Cloud cover</span><span id="roCloud">--</span>
         </div>
       </div>
       </div>
@@ -303,16 +317,15 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
       <div class="seg" role="group" aria-label="Map layer">
         <button type="button" data-grid="rate" aria-pressed="true">Rain</button>
         <button type="button" data-grid="total" aria-pressed="false">Total</button>
-        <button type="button" data-grid="cloud" aria-pressed="false">Clouds</button>
       </div>
     </div>
     <div class="mo mo-tr">
-      <button id="radarBtn" type="button" class="btn" aria-pressed="false" title="Observed rain, past 2 hours">Radar</button>
-      <button id="mapLocate" type="button" class="btn" title="Center on my location">Here</button>
-      <button id="mapHome" type="button" class="btn" title="Center on home (drag the orange pin to move it)">Home</button>
+      <button id="radarBtn" type="button" class="btn geek-only" aria-pressed="false" title="Observed rain, past 2 hours">Radar</button>
+      <button id="mapLocate" type="button" class="btn ic" aria-label="Center on my location" title="Center on my location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg></button>
+      <button id="mapHome" type="button" class="btn ic" aria-label="Set home position" title="Set home: tap, then tap the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 3.5l9 8M5.5 10v10.5h5v-6h3v6h5V10"/></svg></button>
       <button id="mapFs" type="button" class="btn" aria-pressed="false" title="Full screen">⤢</button>
     </div>
-    <div class="hint" id="placeHint" hidden>Tap the map to set home</div>
+    <div class="hint" id="placeHint" hidden>Tap the map to set Home</div>
     <div class="hover" id="hoverVal" hidden></div>
     <div class="mo mo-b">
       <div class="row">
@@ -320,7 +333,7 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
         <label for="fromSel" id="fromWrap" class="from">since <select id="fromSel"></select></label>
       </div>
       <div class="gsum" id="gsum"></div>
-      <div class="row radar" id="skyRow" hidden>
+      <div class="row radar geek-only" id="skyRow" hidden>
         <button id="mapPlay" type="button" class="play" aria-label="Play radar">▶</button>
         <input id="mapSlide" type="range" min="0" max="0" step="1" value="0" aria-label="Radar image time">
         <span class="t" id="mapTime">–</span>
@@ -334,6 +347,15 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
 <section id="view-settings" hidden>
   <div class="sethead"><h1>Settings</h1><button id="setClose" type="button" class="btn">Done</button></div>
   <div class="sgrid">
+    <section class="panel">
+      <div class="ph"><h2>Display</h2></div>
+      <div class="pb set">
+        <label class="tog"><span class="tl"><b>Human</b><i>map only</i></span>
+          <input id="geekTog" type="checkbox" role="switch"><span class="sw" aria-hidden="true"></span>
+          <span class="tl"><b>Geek</b><i>radar, area stats, 12 h chart</i></span></label>
+      </div>
+    </section>
+
     <section class="panel">
       <div class="ph"><h2>Alerts</h2></div>
       <div class="pb set">
@@ -361,13 +383,8 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
     </section>
 
     <section class="panel">
-      <div class="ph"><h2>Area</h2></div>
+      <div class="ph"><h2>Total rain</h2></div>
       <div class="pb set">
-        <div class="field">
-          <label class="fl" for="radiusS">Radius of interest</label>
-          <select id="radiusS" class="radiusSel"><option value="10">10 km</option><option value="20">20 km</option><option value="40">40 km</option></select>
-          <span class="fd">Used for the "around" stats and the circle on the map. Map colors cover the whole visible area.</span>
-        </div>
         <div class="field">
           <label class="fl" for="fromSel2">Total rain counts from</label>
           <select id="fromSel2"></select>
@@ -380,7 +397,7 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
       <div class="ph"><h2>Data sources</h2></div>
       <div class="pb set">
         <ul class="srcs">
-          <li>Rain and cloud forecast: Open-Meteo, refreshed every 15 minutes while the page is open.</li>
+          <li>Rain forecast: Open-Meteo, refreshed every 15 minutes while the page is open.</li>
           <li>Radar: RainViewer, observed rain over the past 2 hours.</li>
         </ul>
         <p class="note">Hours earlier today come from the forecast model, not from rain gauges.</p>
@@ -393,8 +410,8 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
 <nav class="dock" id="dock" aria-label="Forecast time">
   <div class="dock-in">
     <div class="seg" role="group" aria-label="Location">
-      <button type="button" data-loc="here" aria-pressed="true">Here</button>
-      <button type="button" data-loc="home" aria-pressed="false">Home</button>
+      <button type="button" class="ic" data-loc="here" aria-pressed="true" aria-label="Here (my location)" title="Here"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg></button>
+      <button type="button" class="ic" data-loc="home" aria-pressed="false" aria-label="Home" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 3.5l9 8M5.5 10v10.5h5v-6h3v6h5V10"/></svg></button>
     </div>
     <div class="seg" role="group" aria-label="Day">
       <button type="button" data-day="0" aria-pressed="true">Today</button>
@@ -416,15 +433,15 @@ const $$ = s => document.querySelectorAll(s);
 const LS = 'rainwatch.v1';
 const REFRESH_MS = 15 * 60e3, COOLDOWN_MS = 60 * 60e3, SLOTS = 96, STEP = 900, GRID_N = 7;
 const WET_SLOT_MM = 0.1, WET_PERIOD_MM = 0.2;
-const DEFAULTS = {threshold:50, home:{lat:31.973, lon:34.7925}, notif:{}, radius:20, hours:3, tab:'data', fromHour:0, grid:'rate', sky:'off', scope:'point'};
+const DEFAULTS = {mode:'human', threshold:50, home:{lat:31.973, lon:34.7925}, notif:{}, hours:3, tab:'data', fromHour:0, grid:'rate', sky:'off', scope:'point'};
 const NAMES = {here:'Here', home:'Home'};
+const RADIUS = 10;  /* km, fixed */
 const LEVEL_TEXT = {good:'Dry', warn:'Possible', bad:'Rain likely'};
 const RANK = {bad:2, warn:1, good:0};
 /* map color scales: [lower bound, color] */
 const SCALES = {
   rate:{unit:'mm/h', label:'mm/h', steps:[[0.1,'#a9d6ff'],[0.5,'#56a8ff'],[2,'#1f5fd6'],[5,'#f2c230'],[10,'#f07b22'],[20,'#d62828'],[50,'#8e2bbf']]},
   total:{unit:'mm', label:'mm', steps:[[0.2,'#a9d6ff'],[1,'#56a8ff'],[3,'#1f5fd6'],[10,'#f2c230'],[20,'#f07b22'],[40,'#d62828'],[80,'#8e2bbf']]},
-  cloud:{unit:'%', label:'cloud %', steps:[[10,'#eef2f6'],[30,'#cfd7e0'],[50,'#a9b4c1'],[70,'#828e9c'],[90,'#5b6674']]}
 };
 
 let cfg = load();
@@ -436,7 +453,7 @@ const data = {here:null, home:null};
 function load(){
   try { const s = JSON.parse(localStorage.getItem(LS) || '{}');
     if (s.sky === 'clouds') s.sky = 'off';
-    if (!(s.radius >= 10)) s.radius = 20;
+    s.mode = s.mode === 'geek' ? 'geek' : 'human'; if (s.grid === 'cloud') s.grid = 'rate';
     if (s.grid === 'off') s.grid = 'rate';
     return {...DEFAULTS, ...s, home:{...DEFAULTS.home, ...(s.home||{})}, notif:{...(s.notif||{})}}; }
   catch { return {...DEFAULTS, notif:{}}; }
@@ -478,7 +495,7 @@ function getHere(high){
 async function getForecast(pts){
   const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + pts.map(p => p.lat.toFixed(4)).join(',') +
     '&longitude=' + pts.map(p => p.lon.toFixed(4)).join(',') +
-    '&current=precipitation&hourly=precipitation_probability,precipitation,cloud_cover&minutely_15=precipitation' +
+    '&current=precipitation&hourly=precipitation_probability,precipitation&minutely_15=precipitation' +
     '&forecast_days=3&timezone=auto&timeformat=unixtime';
   const r = await fetch(u);
   if (!r.ok){
@@ -489,7 +506,6 @@ async function getForecast(pts){
   return Array.isArray(j) ? j : [j];
 }
 function probAt(d, t){ return hourlyAt(d, 'precipitation_probability', t); }
-function cloudAt(d, t){ return hourlyAt(d, 'cloud_cover', t); }
 function hourlyAt(d, key, t){
   const T = d.hourly.time, P = d.hourly[key];
   if (!P) return null;
@@ -531,9 +547,16 @@ function slotArea(ds, t){
   for (const d of ds){ const v = mmAt(d, t); if (v == null) continue; n++; if (v >= WET_SLOT_MM) wet++; if (v > max) max = v; }
   return {wet:n ? Math.round(wet / n * 100) : null, max};
 }
-function series(r, day){
-  const c = r.ds[0], s = dayStart(c, day), now = Date.now() / 1000;
-  return Array.from({length:SLOTS}, (_, i) => {
+const WIN = 48;  /* chart window: 12 hours */
+let chartT0 = 0;
+function chartWindow(c){
+  const now = Math.floor(Date.now() / 1000), base = sel.day === 0 ? now - (now % STEP) : dayStart(c, 1);
+  const selT = dayStart(c, sel.day) + sel.slot * STEP;
+  return base + Math.floor((selT - base) / (WIN * STEP)) * WIN * STEP;
+}
+function series(r, s){
+  const c = r.ds[0], now = Date.now() / 1000;
+  return Array.from({length:WIN}, (_, i) => {
     const t = s + i * STEP, p = probAt(c, t), a = slotArea(r.ds, t);
     return {t, p:p ?? 0, has:p != null, mm:mmAt(c, t), wet:a.wet, max:a.max, past:t + STEP <= now, level:levelFor(p ?? 0)};
   });
@@ -561,7 +584,6 @@ function periodStats(r, hours){
 function gridValues(r){
   const c = r.ds[0], ds0 = dayStart(c, sel.day), t = ds0 + sel.slot * STEP, tEnd = t + STEP;
   if (cfg.grid === 'rate') return {t, vals:r.ds.map(d => { const v = mmAt(d, t); return v == null ? null : v * 4; })};
-  if (cfg.grid === 'cloud') return {t, vals:r.ds.map(d => cloudAt(d, t + STEP / 2))};
   const from = ds0 + cfg.fromHour * 3600;
   if (from >= tEnd) return {t, from, vals:null};
   return {t, from, vals:r.ds.map(d => sumMm(d, from, tEnd))};
@@ -578,33 +600,36 @@ function centerOf(id){ return id === 'home' ? cfg.home : herePos; }
 
 function renderTimeline(){
   const r = data[sel.loc];
-  $('#tlTitle').textContent = 'Rain chance · ' + NAMES[sel.loc] + ' · ' + (sel.day ? 'Tomorrow' : 'Today');
   $('#roAccL').textContent = 'Total since ' + hLabel(cfg.fromHour);
   const svg = $('#chartSvg'), err = $('#chartErr');
   $('#mslot').value = sel.slot;
   const blank = () => { $('#roPct').className = 'ro-pct'; $('#roPct').innerHTML = '--<small>%</small>';
-    $('#roTime').textContent = '--:--'; ['#roMm','#roAcc','#roCloud'].forEach(s => $(s).textContent = '--'); };
+    $('#roTime').textContent = '--:--'; ['#roMm','#roAcc'].forEach(s => $(s).textContent = '--'); };
   if (!r || r.error){ svg.innerHTML = ''; err.textContent = r ? r.error : ''; blank(); return; }
   err.textContent = '';
-  const c = r.ds[0], s = series(r, sel.day), H = 120, W = 10, top = 6;
+  const c = r.ds[0], t0 = chartT0 = chartWindow(c), s = series(r, t0), H = 120, W = 960 / WIN, top = 6;
+  const si = Math.round((dayStart(c, sel.day) + sel.slot * STEP - t0) / STEP);
+  $('#tlTitle').textContent = 'Rain chance · ' + NAMES[sel.loc] + ' · ' + hhmm(c, t0) + '–' + hhmm(c, t0 + WIN * STEP);
+  renderHours(c, t0);
   const y = v => H - v / 100 * (H - top);
-  const parts = ['<rect class="selband" x="' + sel.slot * W + '" y="0" width="' + W + '" height="' + H + '"/>'];
+  const parts = ['<rect class="selband" x="' + si * W + '" y="0" width="' + W + '" height="' + H + '"/>'];
   s.forEach((x, i) => {
     const h = Math.max(x.p > 0 ? 1.5 : 0, x.p / 100 * (H - top));
-    parts.push('<rect class="bar ' + x.level + (x.past && sel.day === 0 ? ' past' : '') + '" x="' + (i * W + 1.5) + '" y="' + (H - h) + '" width="' + (W - 3) + '" height="' + h + '"/>');
+    parts.push('<rect class="bar ' + x.level + (x.past ? ' past' : '') + '" x="' + (i * W + 1.5) + '" y="' + (H - h) + '" width="' + (W - 3) + '" height="' + h + '"/>');
   });
   const ty = y(cfg.threshold);
   parts.push('<line class="thr" vector-effect="non-scaling-stroke" x1="0" x2="960" y1="' + ty + '" y2="' + ty + '"/>');
-  if (sel.day === 0){
-    const nx = (Date.now() / 1000 - dayStart(c, 0)) / STEP * W;
+  const nowI = (Date.now() / 1000 - t0) / STEP;
+  if (nowI >= 0 && nowI <= WIN){
+    const nx = nowI * W;
     parts.push('<line class="nowl" vector-effect="non-scaling-stroke" x1="' + nx + '" x2="' + nx + '" y1="0" y2="' + H + '"/>');
   }
-  const sx = sel.slot * W + W / 2;
+  const sx = si * W + W / 2;
   parts.push('<line class="selline" vector-effect="non-scaling-stroke" x1="' + sx + '" x2="' + sx + '" y1="0" y2="' + H + '"/>');
   svg.innerHTML = parts.join('');
   const lab = $('#thrLab'); lab.style.top = (ty / H * 100) + '%'; lab.textContent = cfg.threshold + '%';
 
-  const x = s[sel.slot];
+  const x = s[si];
   const when = sel.day ? 'Tomorrow' : (sel.slot === nowSlot(c) ? 'Today · now' : x.past ? 'Today · earlier' : 'Today');
   $('#roWhen').textContent = 'At ' + NAMES[sel.loc] + ' · ' + when;
   $('#roTime').textContent = hhmm(c, x.t) + '–' + hhmm(c, x.t + STEP);
@@ -614,8 +639,6 @@ function renderTimeline(){
   $('#roMm').textContent = x.mm == null ? '--' : fmm(x.mm);
   const from = dayStart(c, sel.day) + cfg.fromHour * 3600;
   $('#roAcc').textContent = from >= x.t + STEP ? 'after this slot' : fmm(sumMm(c, from, x.t + STEP));
-  const cc = cloudAt(c, x.t + STEP / 2);
-  $('#roCloud').textContent = cc == null ? '--' : cc + '%';
   $('#mslotT').innerHTML = '<span class="pfx">' + (sel.day ? 'Tomorrow ' : 'Today ') + '</span>' + hhmm(c, x.t) + '–' + hhmm(c, x.t + STEP);
 }
 
@@ -652,7 +675,7 @@ function renderStats(){
   const name = NAMES[sel.loc], place = sel.loc === 'home' ? 'home' : 'your location', h = cfg.hours + (cfg.hours === 1 ? ' hour' : ' hours');
   $('#olTitle').textContent = (sel.day === 0 ? 'Next ' + h : h) + ' · ' + name;
   $('#scPoint').textContent = 'At ' + name;
-  $('#scArea').textContent = cfg.radius + ' km around';
+  $('#scArea').textContent = RADIUS + ' km around';
   $$('[data-scope]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.scope === cfg.scope)));
   const r = data[sel.loc];
   if (!r || r.error){ const p = document.createElement('p'); p.className = r ? 'err' : 'note'; p.textContent = r ? r.error : 'Loading forecast…'; box.append(p); return; }
@@ -686,7 +709,7 @@ function renderStats(){
       {lvl:levelFor(A.pmax), k:'Highest rain chance', s:A.pmax ? dirOf(A.pmaxAt) : 'whole area', v:A.pmax + '%'},
       {lvl:pctLevel(A.wetPeak), k:'Most of area raining at once', s:A.wetPeak ? 'at ' + tm(A.wetPeakT) : 'no rain in this period', v:A.wetPeak + '%'}
     ];
-    note.textContent = 'Values across ' + cfg.radius + ' km around ' + place + ', ' + win + ' (' + r.pts.length + ' forecast points).' + (sel.day ? ' Move the time slider to change the start.' : '');
+    note.textContent = 'Values across ' + RADIUS + ' km around ' + place + ', ' + win + ' (' + r.pts.length + ' forecast points).' + (sel.day ? ' Move the time slider to change the start.' : '');
   }
   items.sort((a, b) => RANK[b.lvl] - RANK[a.lvl]);
   for (const it of items){
@@ -700,13 +723,13 @@ function renderStats(){
 }
 $$('[data-scope]').forEach(b => b.addEventListener('click', () => { cfg.scope = b.dataset.scope; save(); renderStats(); }));
 
-function renderHours(){
+function renderHours(c, t0){
   const h = $('#hours'); h.textContent = '';
-  for (let k = 0; k <= 24; k += 3){
+  for (let k = 0; k <= 12; k += 2){
     const sp = document.createElement('span');
-    sp.style.left = (k / 24 * 100) + '%';
-    sp.textContent = hLabel(k);
-    if (k % 6) sp.className = 'minor';
+    sp.style.left = (k / 12 * 100) + '%';
+    sp.textContent = hhmm(c, t0 + k * 3600);
+    if (k % 4) sp.className = 'minor';
     h.append(sp);
   }
 }
@@ -734,7 +757,7 @@ function renderAll(){ renderTimeline(); renderStats(); drawArea(); syncHomeBox()
 
 let busy = false, again = false;
 async function loadOne(id, posFn){
-  try { const c = await posFn(); const pts = samplePoints(c, cfg.radius); const ds = await getForecast(pts); data[id] = {ds, pts, c}; }
+  try { const c = await posFn(); const pts = samplePoints(c, RADIUS); const ds = await getForecast(pts); data[id] = {ds, pts, c}; }
   catch (e) { data[id] = {error:e.message || 'Could not load forecast'}; }
 }
 async function refresh(){
@@ -755,13 +778,21 @@ async function refresh(){
 function pickSlot(i){ stopFPlay(); sel.slot = Math.max(0, Math.min(SLOTS - 1, i)); slotTouched = true; renderSlot(); }
 $('#mslot').addEventListener('input', e => pickSlot(+e.target.value));
 const chart = $('#chart');
-function chartPick(e){ const b = chart.getBoundingClientRect(); pickSlot(Math.floor((e.clientX - b.left) / b.width * SLOTS)); }
+function chartPick(e){
+  const r = data[sel.loc]; if (!r || !r.ds) return;
+  const b = chart.getBoundingClientRect(), c = r.ds[0];
+  let t = chartT0 + Math.max(0, Math.min(WIN - 1, Math.floor((e.clientX - b.left) / b.width * WIN))) * STEP;
+  t = Math.max(dayStart(c, 0), Math.min(dayStart(c, 2) - STEP, t));
+  const d = t >= dayStart(c, 1) ? 1 : 0;
+  if (d !== sel.day){ sel.day = d; syncDayButtons(); }
+  pickSlot(Math.round((t - dayStart(c, d)) / STEP));
+}
 chart.addEventListener('pointerdown', e => { chart.setPointerCapture(e.pointerId); chartPick(e); });
 chart.addEventListener('pointermove', e => { if (e.buttons) chartPick(e); });
 
+function syncDayButtons(){ $$('[data-day]').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.day === sel.day))); }
 $$('[data-day]').forEach(b => b.addEventListener('click', () => {
-  sel.day = +b.dataset.day;
-  $$('[data-day]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  sel.day = +b.dataset.day; syncDayButtons();
   const r = data[sel.loc];
   if (sel.day === 0 && r && r.ds){ sel.slot = nowSlot(r.ds[0]); slotTouched = false; }
   renderSlot();
@@ -796,12 +827,18 @@ $$('#fromSel, #fromSel2').forEach(s => s.addEventListener('change', e => {
   $('#fromSel').value = cfg.fromHour; $('#fromSel2').value = cfg.fromHour;
   renderSlot();
 }));
-function syncRadius(){ $$('.radiusSel').forEach(s => s.value = cfg.radius); }
-$$('.radiusSel').forEach(s => s.addEventListener('change', e => {
-  cfg.radius = +e.target.value; save(); syncRadius(); areaFitted = false; drawArea(true); refresh();
-}));
 $('#hoursSel').value = cfg.hours;
 $('#hoursSel').addEventListener('change', e => { cfg.hours = +e.target.value; save(); renderStats(); });
+
+
+function applyMode(){
+  const geek = cfg.mode === 'geek';
+  document.body.classList.toggle('geek', geek);
+  if (!geek && cfg.sky !== 'off'){ cfg.sky = 'off'; if (map) buildFrames(); syncLayerButtons(); }
+  sizeDock();
+  if (map) setTimeout(() => { map.invalidateSize(); drawArea(true); drawGrid(); }, 60);
+}
+$('#geekTog').addEventListener('change', e => { cfg.mode = e.target.checked ? 'geek' : 'human'; save(); applyMode(); });
 
 function syncHomeBox(){ $('#homeBox').textContent = cfg.home.lat.toFixed(5) + ', ' + cfg.home.lon.toFixed(5); }
 function setHome(lat, lon){
@@ -813,7 +850,7 @@ function setHome(lat, lon){
 }
 function syncSettings(){
   $('#thr').value = cfg.threshold; $('#thrVal').textContent = cfg.threshold + '%';
-  syncHomeBox(); syncRadius();
+  syncHomeBox(); $('#geekTog').checked = cfg.mode === 'geek';
   const n = $('#notifNote'), b = $('#notifBtn');
   if (!('Notification' in window)){ b.hidden = true; n.textContent = 'No notification support in this browser. Alerts show at the top of the page.'; return; }
   if (Notification.permission === 'granted'){ b.hidden = true; n.textContent = 'Notifications on. Keep this page open (a pinned tab works).'; }
@@ -907,7 +944,7 @@ function drawArea(fit){
   if (areaCircle){ map.removeLayer(areaCircle); areaCircle = null; }
   if (c){
     /* radius of interest: outline only, the colors cover the whole map */
-    areaCircle = L.circle([c.lat, c.lon], {radius:cfg.radius * 1000, color:'#0a62c9', weight:2, dashArray:'6 6', fill:false, interactive:false, pane:'area'}).addTo(map);
+    areaCircle = L.circle([c.lat, c.lon], {radius:RADIUS * 1000, color:'#0a62c9', weight:2, dashArray:'6 6', fill:false, interactive:false, pane:'area'}).addTo(map);
     if (fit || !areaFitted){
       areaFitted = true;
       const bottom = ($('.mo-b').offsetHeight || 120) + 40, topPad = ($('.mo-tl').offsetHeight || 60) + 30;
@@ -948,7 +985,7 @@ const fieldCanvas = document.createElement('canvas');
 let fieldOverlay = null, lastField = null;
 const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 function rgbaFor(sc, v){
-  const st = SCALES[sc].steps, alpha = sc === 'cloud' ? 0.6 : 0.68;
+  const st = SCALES[sc].steps, alpha = 0.68;
   const lo0 = st[0][0];
   if (v < lo0 * 0.4) return null;
   if (v < lo0){ const [r, g, b] = hex2rgb(st[0][1]); return [r, g, b, alpha * (v - lo0 * 0.4) / (lo0 * 0.6)]; }
@@ -1030,7 +1067,7 @@ function drawContours(P, sc){
       const pt = map.latLngToContainerPoint(ll);
       if (labels.some(q => Math.hypot(q.x - pt.x, q.y - pt.y) < 90)) continue;
       labels.push(pt);
-      const txt = sc === 'cloud' ? L0 + '%' : L0 + ' ' + SCALES[sc].unit;
+      const txt = L0 + ' ' + SCALES[sc].unit;
       L.marker(ll, {pane:'area', interactive:false, keyboard:false, icon:L.divIcon({className:'clab', html:'<span>' + txt + '</span>', iconSize:[0, 0]})}).addTo(contourLayer);
     }
   }
@@ -1041,12 +1078,12 @@ function fieldValueAt(ll){
   if (gx < 0 || gy < 0 || gx > VIEW_N - 1 || gy > VIEW_N - 1) return null;
   return idw(lastField.P, gx, gy);
 }
-const fvalOf = (sc, v) => sc === 'cloud' ? Math.round(v) + '%' : fmm(v, SCALES[sc].unit);
+const fvalOf = (sc, v) => fmm(v, SCALES[sc].unit);
 /* wettest point inside the circle, read from the smooth field */
 function drawWettest(sc, c){
   if (wetPin){ map.removeLayer(wetPin); wetPin = null; }
-  if (!lastField || !c || sc === 'cloud') return null;
-  const R = cfg.radius, kLat = 1 / 111.32, kLon = 1 / (111.32 * Math.cos(c.lat * Math.PI / 180)), st = R / 20;
+  if (!lastField || !c) return null;
+  const R = RADIUS, kLat = 1 / 111.32, kLon = 1 / (111.32 * Math.cos(c.lat * Math.PI / 180)), st = R / 20;
   let best = null;
   for (let y = -R; y <= R; y += st) for (let x = -R; x <= R; x += st){
     if (Math.hypot(x, y) > R) continue;
@@ -1064,7 +1101,6 @@ function drawWettest(sc, c){
 function viewValues(){
   const c = view.ds[0], ds0 = dayStart(c, sel.day), t = ds0 + sel.slot * STEP, tEnd = t + STEP;
   if (cfg.grid === 'rate') return {t, vals:view.ds.map(d => { const v = mmAt(d, t); return v == null ? null : v * 4; })};
-  if (cfg.grid === 'cloud') return {t, vals:view.ds.map(d => cloudAt(d, t + STEP / 2))};
   const from = ds0 + cfg.fromHour * 3600;
   if (from >= tEnd) return {t, from, vals:null};
   return {t, from, vals:view.ds.map(d => sumMm(d, from, tEnd))};
@@ -1087,10 +1123,10 @@ function drawGrid(){
   let cv = null;
   if (r && r.ds){
     const d = r.ds[0];
-    cv = sc === 'rate' ? (mmAt(d, g.t) ?? 0) * 4 : sc === 'cloud' ? cloudAt(d, g.t + STEP / 2) : (g.from < g.t + STEP ? sumMm(d, g.from, g.t + STEP) : null);
+    cv = sc === 'rate' ? (mmAt(d, g.t) ?? 0) * 4 : (g.from < g.t + STEP ? sumMm(d, g.from, g.t + STEP) : null);
   }
   const wet = drawWettest(sc, c);
-  if (c && cv != null) drawCenterLabel(c, NAMES[sel.loc] + ' · ' + (sc === 'total' ? fval(cv) + ' since ' + hLabel(cfg.fromHour) : sc === 'cloud' ? 'cloud ' + fval(cv) : fval(cv)));
+  if (c && cv != null) drawCenterLabel(c, NAMES[sel.loc] + ' · ' + (sc === 'total' ? fval(cv) + ' since ' + hLabel(cfg.fromHour) : fval(cv)));
   /* summary for what is on screen */
   const vb = map.getBounds();
   const inView = g.vals.map((v, k) => ({v, p:view.pts[k]})).filter(x => x.v != null && vb.contains([x.p.lat, x.p.lon]));
@@ -1102,11 +1138,6 @@ function drawGrid(){
   const top = list.reduce((a, x) => x.v > a.v ? x : a, list[0]);
   if (cv != null) add(NAMES[sel.loc], fval(cv));
   add('Map avg', fval(avg));
-  if (sc === 'cloud'){
-    const low = list.reduce((a, x) => x.v < a.v ? x : a, list[0]);
-    add('Clearest', fval(low.v) + (c ? ' · ' + relTo(c, low.p.lat, low.p.lon) : ''));
-    return;
-  }
   if (wet) add('Wettest in circle', fval(wet.v) + ' · ' + dirOf({dx:wet.x, dy:wet.y}));
   add('Map max', fval(top.v) + (top.v >= 0.05 && c ? ' · ' + relTo(c, top.p.lat, top.p.lon) : ''));
   const wetCut = sc === 'rate' ? WET_SLOT_MM * 4 : WET_PERIOD_MM;
@@ -1195,12 +1226,11 @@ function setFs(on){
 }
 $('#mapFs').addEventListener('click', () => setFs(!$('#mapwrap').classList.contains('fs')));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#mapwrap').classList.contains('fs')) setFs(false); });
-$('#mapHome').addEventListener('click', () => { if (map) map.flyTo([cfg.home.lat, cfg.home.lon], 11); });
+$('#mapHome').addEventListener('click', () => { if (map) setPlacing(!placing); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && placing) setPlacing(false); });
 
 /* ---------- start ---------- */
-renderHours();
-fillFrom();
+fillFrom(); applyMode();
 syncSettings();
 setTab(cfg.tab === 'settings' ? 'settings' : 'data');
 refresh();
