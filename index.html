@@ -362,7 +362,7 @@ input[type=range]{accent-color:var(--accent)}
         <div class="field">
           <label class="fl" for="radiusS">Radius of interest</label>
           <select id="radiusS" class="radiusSel"><option value="10">10 km</option><option value="20">20 km</option><option value="40">40 km</option></select>
-          <span class="fd">Used for the "around" stats on the Data page. The map shows the forecast for the whole visible area.</span>
+          <span class="fd">Used for the "around" stats and the circle on the map. Map colors cover the whole visible area.</span>
         </div>
         <div class="field">
           <label class="fl" for="fromSel2">Total rain counts from</label>
@@ -856,6 +856,7 @@ function drawHome(){
   const icon = L.divIcon({className:'pin-wrap', html:'<div class="pin-home"></div>', iconSize:[22,22], iconAnchor:[11,26]});
   homePin = L.marker(ll, {icon, draggable:true, zIndexOffset:1000, title:'Home (drag to move)'}).addTo(map);
   homePin.bindTooltip('Home · drag to move', {direction:'top', offset:[0,-24]});
+  homePin.on('drag', () => { if (sel.loc === 'home' && areaCircle) areaCircle.setLatLng(homePin.getLatLng()); });
   homePin.on('dragend', () => { const p = homePin.getLatLng(); setHome(p.lat, p.lng); });
 }
 function drawMe(){
@@ -869,15 +870,25 @@ function drawMe(){
     meAcc = L.circle(ll, {radius:hereAcc || 0, color:'#0a62c9', weight:1, fillColor:'#0a62c9', fillOpacity:0.12, interactive:false, pane:'area'}).addTo(map);
     meDot = L.circleMarker(ll, {radius:8, color:'#ffffff', weight:3, fillColor:'#0a62c9', fillOpacity:1, pane:'area'}).addTo(map).bindTooltip('You are here');
   }
-  if (sel.loc === 'here' && !areaFitted) drawArea();
+  if (sel.loc === 'here') drawArea();
 }
 /* ---------- map: forecast field over the visible map (no radius) ---------- */
 const VIEW_N = 6;            /* 6x6 forecast points across the view */
 let view = null, viewToken = 0, viewTimer = null, lastViewFetch = 0;
+let areaCircle = null;
 function drawArea(fit){
   if (!map) return;
   const d = data[sel.loc], c = (d && d.c) || centerOf(sel.loc);
-  if (c && (fit || !areaFitted)){ areaFitted = true; map.setView([c.lat, c.lon], 10); }
+  if (areaCircle){ map.removeLayer(areaCircle); areaCircle = null; }
+  if (c){
+    /* radius of interest: outline only, the colors cover the whole map */
+    areaCircle = L.circle([c.lat, c.lon], {radius:cfg.radius * 1000, color:'#0a62c9', weight:2, dashArray:'6 6', fill:false, interactive:false, pane:'area'}).addTo(map);
+    if (fit || !areaFitted){
+      areaFitted = true;
+      const bottom = ($('.mo-b').offsetHeight || 120) + 40, topPad = ($('.mo-tl').offsetHeight || 60) + 30;
+      map.fitBounds(areaCircle.getBounds(), {paddingTopLeft:[40, topPad], paddingBottomRight:[40, bottom]});
+    }
+  }
   drawGrid();
 }
 function viewCovers(){
