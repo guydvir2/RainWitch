@@ -123,6 +123,7 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
 .sethead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .sethead h1{margin:0;font-size:1.2rem}
 .wet-pin i{position:absolute;width:16px;height:16px;left:-8px;top:-8px;border-radius:50%;background:var(--bad);border:3px solid #fff;box-shadow:0 1px 4px rgb(0 0 0 / .4)}
+.wet-pin span.l{left:auto;right:12px}
 .wet-pin span{position:absolute;left:12px;top:-11px;white-space:nowrap;font-family:var(--mono);font-size:11px;font-weight:600;color:#0f1b2a;background:#fff;border:1.5px solid var(--bad);border-radius:5px;padding:1px 6px;line-height:16px}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.75rem;color:var(--muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
@@ -255,7 +256,7 @@ body:not(.geek) .mapwrap{height:calc(100dvh - var(--dock,70px) - 84px);min-heigh
 <header class="top">
   <div class="brand">
     <svg viewBox="-2 -3 46 37" aria-hidden="true"><path d="M3 29 L40 16" stroke="#6b4a1e" stroke-width="2.4" stroke-linecap="round"/><path d="M7 27.6 L-1 22.5 L-1 33 Z" fill="#c9962f"/><path d="M5 27.6 L-1 27.8" stroke="#8a6416" stroke-width=".9"/><path d="M19 22 Q11 20 7 25 Q15 25.5 20 25 Z" fill="var(--accent)" opacity=".55"/><path d="M19 23 Q20 13 27 12.5 Q31 17 30 21.5 Z" fill="#3b2a6b"/><circle cx="28.6" cy="9" r="3" fill="#f1c9a5"/><path d="M24.2 8.6 L30.2 -1.5 L33.6 8.6 Z" fill="#241b3d"/><ellipse cx="28.8" cy="8.7" rx="6.6" ry="1.4" fill="#241b3d"/><path d="M25 22 L31 19.8 L32 23" stroke="#241b3d" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <div><b>Rain Witch <span style="font:500 .65rem var(--mono);color:var(--muted)">v0.2</span></b><small id="stamp">Loading…</small></div>
+    <div><b>Rain Witch <span style="font:500 .65rem var(--mono);color:var(--muted)">v0.3</span></b><small id="stamp">Loading…</small></div>
   </div>
   <button id="refresh" type="button" class="btn">Refresh</button>
   <button id="menuBtn" type="button" class="menu" aria-label="Settings" aria-expanded="false"><span></span><span></span><span></span></button>
@@ -1093,9 +1094,10 @@ function drawWettest(sc, c){
     if (!best || v > best.v) best = {v, lat, lon, x, y};
   }
   if (!best || best.v < (sc === 'rate' ? WET_SLOT_MM * 4 : WET_PERIOD_MM)) return null;
-  const txt = 'Wettest · ' + fvalOf(sc, best.v) + ' · ' + dirOf({dx:best.x, dy:best.y});
+  const txt = fvalOf(sc, best.v);
+  const px = map.latLngToContainerPoint([best.lat, best.lon]).x, left = px > map.getSize().x - 75;
   wetPin = L.marker([best.lat, best.lon], {pane:'area', interactive:false, keyboard:false, zIndexOffset:1500,
-    icon:L.divIcon({className:'wet-pin', html:'<i></i><span>' + txt + '</span>', iconSize:[0, 0]})}).addTo(map);
+    icon:L.divIcon({className:'wet-pin', html:'<i></i><span' + (left ? ' class="l"' : '') + '>' + txt + '</span>', iconSize:[0, 0]})}).addTo(map);
   return best;
 }
 function viewValues(){
