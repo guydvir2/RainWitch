@@ -1,0 +1,1120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rain Watch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* Layout: console app. Top bar (brand, tabs, place, day). Data tab: timeline + stat cards. Map tab: full-height map with rain grid. Settings tab: grouped form cards. */
+:root{
+  --bg:#eef2f6; --panel:#ffffff; --panel-2:#f6f8fb; --ink:#0f1b2a; --muted:#5d6d80; --line:#dbe2ea;
+  --accent:#0a62c9; --accent-ink:#ffffff; --home:#c08400;
+  --good:#16884f; --warn:#c08400; --bad:#d13434;
+  --good-soft:#e2f3ea; --warn-soft:#fbf1d9; --bad-soft:#fbe4e4;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --r:10px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0a1119; --panel:#111b27; --panel-2:#0d1620; --ink:#e6edf5; --muted:#8c9eb2; --line:#213041;
+  --accent:#4b9dff; --accent-ink:#06121f; --home:#e8b23e;
+  --good:#40c27e; --warn:#e8b23e; --bad:#ff6b6b;
+  --good-soft:#10291c; --warn-soft:#2e240c; --bad-soft:#341414; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0a1119; --panel:#111b27; --panel-2:#0d1620; --ink:#e6edf5; --muted:#8c9eb2; --line:#213041;
+  --accent:#4b9dff; --accent-ink:#06121f; --home:#e8b23e;
+  --good:#40c27e; --warn:#e8b23e; --bad:#ff6b6b;
+  --good-soft:#10291c; --warn-soft:#2e240c; --bad-soft:#341414; color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--sans);
+  padding-block:0 24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+.wrap{max-width:1400px;margin:0 auto}
+
+/* top bar */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;padding-block:14px}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+.brand svg{width:26px;height:26px;flex:none}
+.brand b{font-size:1.1rem;letter-spacing:-.01em}
+.brand small{display:block;color:var(--muted);font-size:.75rem;font-family:var(--mono)}
+.tabs{display:inline-flex;gap:2px;border-bottom:2px solid var(--line)}
+.tabs button{border:0;background:transparent;padding:6px 14px;margin-bottom:-2px;border-bottom:2px solid transparent;cursor:pointer;font-weight:600;color:var(--muted)}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.seg{display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px}
+.seg button{border:0;background:transparent;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:500;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button:not([aria-pressed="true"]):hover{color:var(--ink)}
+.seg .lab{align-self:center;padding:0 8px 0 6px;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:7px 12px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary,.btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+/* alerts */
+#alerts{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+#alerts:empty{display:none}
+.alert{display:flex;gap:10px;align-items:center;background:var(--bad-soft);border:1px solid var(--bad);border-radius:var(--r);padding:9px 14px;font-weight:600}
+.alert::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--bad);flex:none}
+
+/* panels */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.ph{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.ph h2{margin:0;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.ph .meta{font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+.pb{padding:14px 16px}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}
+.note{margin:0;color:var(--muted);font-size:.78rem}
+.err{color:var(--bad);font-weight:600;font-size:.9rem}
+select{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-family:var(--mono);font-size:.82rem}
+input[type=range]{accent-color:var(--accent)}
+
+/* timeline */
+.combo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:28px}
+.ol-col{min-width:0}
+.tl-col{min-width:0;display:flex;flex-direction:column;gap:10px;padding-left:28px;border-left:1px solid var(--line)}
+.tlh{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px}
+.tlh h3{margin:0;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tlh .meta{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.readout{display:flex;flex-wrap:wrap;align-items:center;gap:6px 22px;padding-top:12px;border-top:1px solid var(--line)}
+.readout .ro-head{display:flex;flex-direction:column}
+.ro-when{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.ro-time{font-family:var(--mono);font-size:1.45rem;font-weight:600;font-variant-numeric:tabular-nums}
+.ro-pct{font-family:var(--mono);font-size:2.6rem;line-height:1;font-weight:600;font-variant-numeric:tabular-nums}
+.ro-pct small{font-size:1.3rem;color:var(--muted)}
+.ro-pct.good{color:var(--good)} .ro-pct.warn{color:var(--warn)} .ro-pct.bad{color:var(--bad)}
+.ro-sub{font-size:.85rem;color:var(--muted)}
+.ro-kv{display:grid;grid-template-columns:auto auto;justify-content:start;gap:2px 12px;font-size:.85rem}
+.ro-kv span:nth-child(odd){color:var(--muted)}
+.ro-kv span:nth-child(even){font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+.chartbox{min-width:0;display:flex;flex-direction:column;gap:6px}
+.chart{position:relative;height:160px;cursor:ew-resize;touch-action:none;background:var(--panel-2);border-radius:8px;border:1px solid var(--line)}
+.chart svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.bar.good{fill:var(--good)} .bar.warn{fill:var(--warn)} .bar.bad{fill:var(--bad)}
+.bar.past{opacity:.3}
+.wetl{fill:none;stroke:var(--accent);stroke-width:2}
+.thr{stroke:var(--bad);stroke-dasharray:4 4;stroke-width:1}
+.nowl{stroke:var(--ink);stroke-width:1.5;opacity:.55}
+.selband{fill:var(--accent);opacity:.16}
+.selline{stroke:var(--accent);stroke-width:2}
+.thrlab{position:absolute;right:6px;font-family:var(--mono);font-size:.7rem;color:var(--bad);transform:translateY(-120%)}
+.hours{position:relative;height:16px;font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.hours span{position:absolute;transform:translateX(-50%)}
+.hours span:first-child{transform:none} .hours span:last-child{transform:translateX(-100%)}
+#slot{width:100%;margin:0}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.75rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.legend i.line{height:3px;width:14px;vertical-align:2px}
+
+/* outlook */
+.seg.sm button{padding:4px 10px;font-size:.82rem}
+.nowrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:12px;font-size:.85rem;color:var(--muted)}
+.nowrow:empty{display:none}
+.nowrow .nw{display:flex;align-items:center;gap:6px}
+.stats.ol{display:flex;flex-direction:column}
+.cval span{position:absolute;transform:translate(-50%,calc(-100% - 14px));white-space:nowrap;font-family:var(--mono);font-size:12px;font-weight:600;color:#fff;background:#0f1b2a;border-radius:6px;padding:3px 8px;box-shadow:0 2px 6px rgb(0 0 0 / .3)}
+.cval span::after{content:"";position:absolute;left:50%;bottom:-5px;margin-left:-5px;border:5px solid transparent;border-bottom:0;border-top-color:#0f1b2a}
+.stats{display:flex;flex-direction:column}
+.stat{display:grid;grid-template-columns:14px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.stat:first-child{border-top:0;padding-top:0}
+.stat .dot{width:10px;height:10px;border-radius:50%}
+.stat.good .dot{background:var(--good)} .stat.warn .dot{background:var(--warn)} .stat.bad .dot{background:var(--bad)}
+.stat .k{font-size:.88rem}
+.stat .k small{display:block;color:var(--muted);font-size:.74rem}
+.stat .v{font-family:var(--mono);font-weight:600;font-size:1.1rem;font-variant-numeric:tabular-nums;text-align:right}
+.ctrls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:.8rem;color:var(--muted)}
+.ctrls label{display:flex;align-items:center;gap:6px}
+
+/* next hour */
+.nh{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.nh th{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:center;padding:0 4px 8px}
+.nh th:first-child{text-align:left}
+.nh td{padding:6px 4px;text-align:center;border-top:1px solid var(--line)}
+.nh td:first-child{text-align:left;font-weight:600}
+.nh td small{display:block;color:var(--muted);font-weight:400;font-size:.72rem}
+.chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-weight:600;padding:3px 8px;border-radius:999px;font-size:.85rem}
+.chip::before{content:"";width:8px;height:8px;border-radius:50%}
+.chip.good{background:var(--good-soft)} .chip.good::before{background:var(--good)}
+.chip.warn{background:var(--warn-soft)} .chip.warn::before{background:var(--warn)}
+.chip.bad{background:var(--bad-soft)} .chip.bad::before{background:var(--bad)}
+.you{font-family:var(--mono);font-size:.76rem;color:var(--muted);margin-top:10px;overflow-wrap:anywhere}
+
+/* settings tab */
+.sgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.set{display:flex;flex-direction:column;gap:14px}
+.field{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;align-items:center}
+.field .fl{font-weight:500}
+.field .fd{grid-column:1 / -1;color:var(--muted);font-size:.78rem}
+.field input[type=range]{grid-column:1 / -1;width:100%}
+.set .btns{display:flex;flex-wrap:wrap;gap:8px}
+.homebox{font-family:var(--mono);font-size:.85rem;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;overflow-wrap:anywhere}
+.srcs{margin:0;padding-left:18px;color:var(--muted);font-size:.85rem;display:flex;flex-direction:column;gap:4px}
+
+/* map tab */
+.mapwrap{position:relative;margin-top:14px;height:min(72vh,680px);min-height:460px;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);background:var(--panel-2)}
+#map{position:absolute;inset:0;isolation:isolate}
+#map.placing{cursor:crosshair}
+.mo{position:absolute;z-index:1000;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mo-tl{top:12px;left:12px;flex-direction:column;align-items:flex-start}
+.mo-tr{top:12px;right:12px;justify-content:flex-end}
+.mo .seg,.mo .btn{box-shadow:0 1px 3px rgb(0 0 0 / .15)}
+.mo-b{left:12px;right:12px;bottom:26px;background:color-mix(in srgb,var(--panel) 93%,transparent);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;backdrop-filter:blur(6px);flex-direction:column;align-items:stretch;gap:8px}
+.mo-b .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.mo-b .row input[type=range]{flex:1;min-width:140px}
+.mo-b .rl{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;min-width:4.6em}
+.mo-b .t{font-family:var(--mono);font-weight:600;min-width:5.2em;text-align:right;font-variant-numeric:tabular-nums}
+.mo-b .src{font-size:.75rem;color:var(--muted);overflow-wrap:anywhere}
+.mo-b label{display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted);white-space:nowrap}
+.mo-b label input[type=range]{width:90px;flex:none;min-width:0}
+.gsum{font-size:.85rem;display:flex;flex-wrap:wrap;gap:4px 16px;color:var(--muted)}
+.gsum b{font-family:var(--mono);font-weight:600;color:var(--ink)}
+.scale{flex:1;min-width:0;display:flex;align-items:center;gap:10px}
+.scale .sl{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--muted);white-space:nowrap}
+.scale .bar2{flex:1;min-width:0;position:relative;height:22px}
+.scale .bar2 i{position:absolute;left:0;right:0;top:0;height:8px;border-radius:4px}
+.scale .bar2 span{position:absolute;top:10px;font-family:var(--mono);font-size:.68rem;color:var(--muted);transform:translateX(-50%)}
+.from{font-size:.8rem}
+.play{width:38px;height:38px;flex:none;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer;font-size:.95rem;line-height:1}
+.play[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.mo-b .radar{border-top:1px solid var(--line);padding-top:8px}
+.mo-b .radar .play{width:30px;height:30px;font-size:.8rem}
+.mo-b input[type=range]{height:22px}
+.clab span{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;font-family:var(--mono);font-size:11px;font-weight:600;color:#0f1b2a;background:rgb(255 255 255 / .85);border-radius:4px;padding:0 4px;line-height:16px;box-shadow:0 0 0 1px rgb(15 27 42 / .15)}
+.mapwrap.fs{position:fixed;inset:0;z-index:3000;height:auto;min-height:0;margin:0;border-radius:0;border:0}
+.hover{position:absolute;z-index:1000;pointer-events:none;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-family:var(--mono);font-size:.8rem;font-weight:600;box-shadow:0 2px 6px rgb(0 0 0 / .18);transform:translate(12px,-120%);white-space:nowrap}
+.hint{position:absolute;z-index:1000;left:50%;top:110px;transform:translateX(-50%);background:var(--accent);color:var(--accent-ink);padding:7px 14px;border-radius:999px;font-weight:600;font-size:.85rem;box-shadow:0 2px 6px rgb(0 0 0 / .2);white-space:nowrap}
+.leaflet-top.leaflet-right{top:56px}
+.leaflet-container{font-family:var(--sans)}
+.pin-home{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--home);border:3px solid #fff;box-shadow:0 1px 4px rgb(0 0 0 / .4)}
+.pin-wrap{cursor:grab}
+
+@media (max-width:860px){
+  .cards,.sgrid{grid-template-columns:minmax(0,1fr)}
+  .combo{grid-template-columns:minmax(0,1fr)}
+  .tl-col{padding-left:0;border-left:0;padding-top:16px;border-top:1px solid var(--line)}
+  .mo-b label.op{display:none}
+}
+@media (max-width:600px){
+  .hours span.minor{display:none}
+  .mo-tr{top:60px;left:12px;right:12px;justify-content:flex-start}
+  .leaflet-top.leaflet-right{top:108px}
+  .hint{top:110px}
+  .tl .ph .meta{display:none}
+  .mapwrap{height:78vh;min-height:520px}
+  .seg button{padding:6px 9px}
+  .mo-b .src{display:none}
+  .mo-b .t{min-width:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 20a6 6 0 0 1 .6-12A8 8 0 0 1 25 10a5 5 0 0 1-1 10z" fill="var(--accent)"/><path d="M11 24l-1.5 4M17 24l-1.5 4M23 24l-1.5 4" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/></svg>
+    <div><b>Rain Watch</b><small id="stamp">Loading…</small></div>
+  </div>
+  <div class="tabs" role="tablist" aria-label="View">
+    <button type="button" role="tab" id="tab-data" data-tab="data" aria-selected="true" aria-controls="view-data">Data</button>
+    <button type="button" role="tab" id="tab-settings" data-tab="settings" aria-selected="false" aria-controls="view-settings">Settings</button>
+  </div>
+  <div class="seg" role="group" aria-label="Location">
+    <button type="button" data-loc="here" aria-pressed="true">Here</button>
+    <button type="button" data-loc="home" aria-pressed="false">Home</button>
+  </div>
+  <div class="seg" role="group" aria-label="Day">
+    <button type="button" data-day="0" aria-pressed="true">Today</button>
+    <button type="button" data-day="1" aria-pressed="false">Tomorrow</button>
+  </div>
+  <button id="refresh" type="button" class="btn">Refresh</button>
+</header>
+
+<div id="alerts" aria-live="polite"></div>
+
+<!-- DATA TAB -->
+<section id="view-data" role="tabpanel" aria-labelledby="tab-data">
+  <section class="panel" aria-label="Outlook and rain chance">
+    <div class="ph">
+      <h2 id="olTitle">Next 3 hours · Here</h2>
+      <div class="ctrls">
+        <div class="seg sm" role="group" aria-label="Outlook scope">
+          <button type="button" data-scope="point" aria-pressed="true" id="scPoint">At Here</button>
+          <button type="button" data-scope="area" aria-pressed="false" id="scArea">20 km around</button>
+        </div>
+        <label for="hoursSel">Next
+          <select id="hoursSel"><option value="1">1 h</option><option value="3">3 h</option><option value="6">6 h</option><option value="12">12 h</option><option value="24">24 h</option></select>
+        </label>
+      </div>
+    </div>
+    <div class="pb combo">
+      <div class="ol-col">
+        <div class="nowrow" id="nowRow"></div>
+        <div class="stats ol" id="stats"><p class="note">Loading forecast…</p></div>
+        <p class="note" id="olNote"></p>
+      </div>
+      <div class="tl-col">
+        <div class="tlh"><h3 id="tlTitle">Rain chance · Here · Today</h3><span class="meta">15-minute steps · at the point</span></div>
+      <div class="chartbox">
+        <div class="chart" id="chart" aria-hidden="true">
+          <svg id="chartSvg" viewBox="0 0 960 120" preserveAspectRatio="none"></svg>
+          <span class="thrlab" id="thrLab"></span>
+        </div>
+        <div class="hours" id="hours"></div>
+        <input id="slot" type="range" min="0" max="95" step="1" value="0" aria-label="Time of day, 15-minute steps">
+        <div class="legend">
+          <span><i style="background:var(--good)"></i>Dry</span>
+          <span><i style="background:var(--warn)"></i>Possible</span>
+          <span><i style="background:var(--bad)"></i>At or above alert</span>
+          <span id="chartErr" class="err"></span>
+        </div>
+      </div>
+      <div class="readout">
+        <div class="ro-head"><div class="ro-when" id="roWhen">Today</div><div class="ro-time" id="roTime">--:--</div></div>
+        <div class="ro-head"><div class="ro-pct" id="roPct">--<small>%</small></div><div class="ro-sub" id="roSub">Rain chance</div></div>
+        <div class="ro-kv">
+          <span>Rain in these 15 min</span><span id="roMm">--</span>
+          <span id="roAccL">Total since 00:00</span><span id="roAcc">--</span>
+          <span>Cloud cover</span><span id="roCloud">--</span>
+        </div>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="mapwrap" id="mapwrap" aria-label="Weather map">
+    <div id="map"></div>
+    <div class="mo mo-tl">
+      <div class="seg" role="group" aria-label="Map layer">
+        <button type="button" data-grid="rate" aria-pressed="true">Rain</button>
+        <button type="button" data-grid="total" aria-pressed="false">Total</button>
+        <button type="button" data-grid="cloud" aria-pressed="false">Clouds</button>
+      </div>
+    </div>
+    <div class="mo mo-tr">
+      <button id="radarBtn" type="button" class="btn" aria-pressed="false" title="Observed rain, past 2 hours">Radar</button>
+      <button id="mapLocate" type="button" class="btn" title="Center on my location">Me</button>
+      <button id="mapHome" type="button" class="btn" title="Center on home (drag the orange pin to move it)">Home</button>
+      <button id="mapFs" type="button" class="btn" aria-pressed="false" title="Full screen">⤢</button>
+    </div>
+    <div class="hint" id="placeHint" hidden>Tap the map to set home</div>
+    <div class="hover" id="hoverVal" hidden></div>
+    <div class="mo mo-b">
+      <div class="row">
+        <button id="fPlay" type="button" class="play" aria-label="Play forecast">▶</button>
+        <input id="mslot" type="range" min="0" max="95" step="1" value="0" aria-label="Forecast time, 15-minute steps">
+        <span class="t" id="mslotT">--:--</span>
+      </div>
+      <div class="row">
+        <div class="scale" id="scale"></div>
+        <label for="fromSel" id="fromWrap" class="from">since <select id="fromSel"></select></label>
+      </div>
+      <div class="gsum" id="gsum"></div>
+      <div class="row radar" id="skyRow" hidden>
+        <button id="mapPlay" type="button" class="play" aria-label="Play radar">▶</button>
+        <input id="mapSlide" type="range" min="0" max="0" step="1" value="0" aria-label="Radar image time">
+        <span class="t" id="mapTime">–</span>
+        <span class="src">Radar, past 2 h</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SETTINGS TAB -->
+<section id="view-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+  <div class="sgrid">
+    <section class="panel">
+      <div class="ph"><h2>Alerts</h2></div>
+      <div class="pb set">
+        <div class="field">
+          <label class="fl" for="thr">Alert level</label><b id="thrVal" class="mono"></b>
+          <input id="thr" type="range" min="10" max="90" step="5">
+          <span class="fd">An alert fires when the rain chance now, in 30 min or in 1 hour reaches this level.</span>
+        </div>
+        <div class="btns"><button id="notifBtn" type="button" class="btn primary">Enable notifications</button></div>
+        <p class="note" id="notifNote"></p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="ph"><h2>Home</h2></div>
+      <div class="pb set">
+        <div class="homebox" id="homeBox"></div>
+        <div class="btns">
+          <button id="placeHome2" type="button" class="btn">Place home on map</button>
+          <button id="hereAsHome" type="button" class="btn">Set home to here</button>
+        </div>
+        <p class="note">You can also drag the orange pin on the Map tab.</p>
+        <div class="you" id="youInfo">Locating…</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="ph"><h2>Area</h2></div>
+      <div class="pb set">
+        <div class="field">
+          <label class="fl" for="radiusS">Radius of interest</label>
+          <select id="radiusS" class="radiusSel"><option value="10">10 km</option><option value="20">20 km</option><option value="40">40 km</option></select>
+          <span class="fd">Used for area wet %, area totals and the rain grid on the map.</span>
+        </div>
+        <div class="field">
+          <label class="fl" for="fromSel2">Total rain counts from</label>
+          <select id="fromSel2"></select>
+          <span class="fd">Start time for "Total since" on the Data tab and the Total grid on the map.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="ph"><h2>Data sources</h2></div>
+      <div class="pb set">
+        <ul class="srcs">
+          <li>Rain and cloud forecast: Open-Meteo, refreshed every 15 minutes while the page is open.</li>
+          <li>Radar: RainViewer, observed rain over the past 2 hours.</li>
+        </ul>
+        <p class="note">Hours earlier today come from the forecast model, not from rain gauges.</p>
+      </div>
+    </section>
+  </div>
+</section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const LS = 'rainwatch.v1';
+const REFRESH_MS = 15 * 60e3, COOLDOWN_MS = 60 * 60e3, SLOTS = 96, STEP = 900, GRID_N = 7;
+const WET_SLOT_MM = 0.1, WET_PERIOD_MM = 0.2;
+const DEFAULTS = {threshold:50, home:{lat:31.973, lon:34.7925}, notif:{}, radius:20, hours:3, tab:'data', fromHour:0, grid:'rate', sky:'off', scope:'point'};
+const NAMES = {here:'Here', home:'Home'};
+const LEVEL_TEXT = {good:'Dry', warn:'Possible', bad:'Rain likely'};
+const RANK = {bad:2, warn:1, good:0};
+/* map color scales: [lower bound, color] */
+const SCALES = {
+  rate:{unit:'mm/h', label:'mm/h', steps:[[0.1,'#a9d6ff'],[0.5,'#56a8ff'],[2,'#1f5fd6'],[5,'#f2c230'],[10,'#f07b22'],[20,'#d62828'],[50,'#8e2bbf']]},
+  total:{unit:'mm', label:'mm', steps:[[0.2,'#a9d6ff'],[1,'#56a8ff'],[3,'#1f5fd6'],[10,'#f2c230'],[20,'#f07b22'],[40,'#d62828'],[80,'#8e2bbf']]},
+  cloud:{unit:'%', label:'cloud %', steps:[[10,'#eef2f6'],[30,'#cfd7e0'],[50,'#a9b4c1'],[70,'#828e9c'],[90,'#5b6674']]}
+};
+
+let cfg = load();
+let herePos = null, hereAcc = null;
+let sel = {loc:'here', day:0, slot:0};
+let slotTouched = false;
+const data = {here:null, home:null};
+
+function load(){
+  try { const s = JSON.parse(localStorage.getItem(LS) || '{}');
+    if (s.sky === 'clouds') s.sky = 'off';
+    if (!(s.radius >= 10)) s.radius = 20;
+    if (s.grid === 'off') s.grid = 'rate';
+    return {...DEFAULTS, ...s, home:{...DEFAULTS.home, ...(s.home||{})}, notif:{...(s.notif||{})}}; }
+  catch { return {...DEFAULTS, notif:{}}; }
+}
+function save(){ try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch {} }
+
+/* ---------- geometry: grid of cells inside the radius ---------- */
+function samplePoints(c, rKm){
+  const step = 2 * rKm / (GRID_N - 1), mid = (GRID_N - 1) / 2;
+  const pts = [{lat:c.lat, lon:c.lon, dx:0, dy:0}];
+  const kLat = 1 / 111.32, kLon = 1 / (111.32 * Math.cos(c.lat * Math.PI / 180));
+  for (let i = 0; i < GRID_N; i++) for (let j = 0; j < GRID_N; j++){
+    if (i === mid && j === mid) continue;
+    const dx = (i - mid) * step, dy = (j - mid) * step;
+    if (Math.hypot(dx, dy) <= rKm * 1.02) pts.push({lat:c.lat + dy * kLat, lon:c.lon + dx * kLon, dx, dy});
+  }
+  pts.step = step; pts.kLat = kLat; pts.kLon = kLon;
+  return pts;
+}
+const DIRS = ['N','NE','E','SE','S','SW','W','NW'];
+function dirOf(p){
+  const d = Math.hypot(p.dx, p.dy);
+  if (d < 0.5) return 'at center';
+  const a = (Math.atan2(p.dx, p.dy) * 180 / Math.PI + 360) % 360;
+  return (d < 10 ? d.toFixed(1) : Math.round(d)) + ' km ' + DIRS[Math.round(a / 45) % 8];
+}
+
+/* ---------- data ---------- */
+function getHere(high){
+  return new Promise((res, rej) => {
+    if (!navigator.geolocation) return rej(new Error('Location is not available in this browser'));
+    navigator.geolocation.getCurrentPosition(p => {
+      herePos = {lat:p.coords.latitude, lon:p.coords.longitude}; hereAcc = p.coords.accuracy;
+      drawMe(); res(herePos);
+    }, e => rej(new Error(e.code === 1 ? 'Location blocked. Allow location for this page.' : 'Could not get your location')),
+    {enableHighAccuracy:!!high, timeout:15000, maximumAge:high ? 0 : 300000});
+  });
+}
+async function getForecast(pts){
+  const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + pts.map(p => p.lat.toFixed(4)).join(',') +
+    '&longitude=' + pts.map(p => p.lon.toFixed(4)).join(',') +
+    '&current=precipitation&hourly=precipitation_probability,precipitation,cloud_cover&minutely_15=precipitation' +
+    '&forecast_days=3&timezone=auto&timeformat=unixtime';
+  const r = await fetch(u);
+  if (!r.ok){
+    let why = ''; try { why = (await r.json()).reason || ''; } catch {}
+    throw new Error('Weather service error ' + r.status + (why ? ': ' + why : ''));
+  }
+  const j = await r.json();
+  return Array.isArray(j) ? j : [j];
+}
+function probAt(d, t){ return hourlyAt(d, 'precipitation_probability', t); }
+function cloudAt(d, t){ return hourlyAt(d, 'cloud_cover', t); }
+function hourlyAt(d, key, t){
+  const T = d.hourly.time, P = d.hourly[key];
+  if (!P) return null;
+  for (let i = 0; i < T.length - 1; i++){
+    if (t >= T[i] && t < T[i+1]){
+      const a = P[i] ?? 0, b = P[i+1] ?? a, f = (t - T[i]) / (T[i+1] - T[i]);
+      return Math.round(a + (b - a) * f);
+    }
+  }
+  return null;
+}
+function mmAt(d, t){
+  const m = d.minutely_15, q = t - (t % STEP);
+  if (m && m.time){
+    if (!m._idx){ m._idx = new Map(); m.time.forEach((x, i) => m._idx.set(x, i)); }
+    const i = m._idx.get(q);
+    if (i != null && m.precipitation[i] != null) return m.precipitation[i];
+  }
+  const T = d.hourly.time, V = d.hourly.precipitation;
+  for (let i = 0; i < T.length; i++) if (t >= T[i] && t < T[i] + 3600) return V[i] == null ? null : V[i] / 4;
+  return null;
+}
+function sumMm(d, from, to){
+  let s = 0; for (let t = from; t < to; t += STEP){ const v = mmAt(d, t); if (v != null) s += v; } return s;
+}
+function levelFor(p){ return p >= cfg.threshold ? 'bad' : p >= cfg.threshold / 2 ? 'warn' : 'good'; }
+function dayStart(d, day){
+  const off = d.utc_offset_seconds || 0, now = Date.now() / 1000;
+  return Math.floor((now + off) / 86400) * 86400 - off + day * 86400;
+}
+function nowSlot(d){ return Math.max(0, Math.min(SLOTS - 1, Math.floor((Date.now() / 1000 - dayStart(d, 0)) / STEP))); }
+function hhmm(d, t){
+  const x = new Date((t + (d.utc_offset_seconds || 0)) * 1000);
+  return String(x.getUTCHours()).padStart(2, '0') + ':' + String(x.getUTCMinutes()).padStart(2, '0');
+}
+const hLabel = h => String(h).padStart(2, '0') + ':00';
+function slotArea(ds, t){
+  let wet = 0, n = 0, max = 0;
+  for (const d of ds){ const v = mmAt(d, t); if (v == null) continue; n++; if (v >= WET_SLOT_MM) wet++; if (v > max) max = v; }
+  return {wet:n ? Math.round(wet / n * 100) : null, max};
+}
+function series(r, day){
+  const c = r.ds[0], s = dayStart(c, day), now = Date.now() / 1000;
+  return Array.from({length:SLOTS}, (_, i) => {
+    const t = s + i * STEP, p = probAt(c, t), a = slotArea(r.ds, t);
+    return {t, p:p ?? 0, has:p != null, mm:mmAt(c, t), wet:a.wet, max:a.max, past:t + STEP <= now, level:levelFor(p ?? 0)};
+  });
+}
+function nextHour(d){
+  const now = Math.floor(Date.now() / 1000);
+  return [0, 30, 60].map(k => {
+    let p = probAt(d, now + k * 60) ?? 0;
+    const raining = k === 0 && d.current && d.current.precipitation > 0;
+    if (raining) p = 100;
+    return {k, p, raining, level:levelFor(p)};
+  });
+}
+function periodStats(r, hours){
+  const now = Math.floor(Date.now() / 1000), t0 = now - (now % STEP), t1 = t0 + hours * 3600;
+  const per = r.ds.map((d, i) => ({i, sum:sumMm(d, t0, t1)}));
+  const wet = per.filter(x => x.sum >= WET_PERIOD_MM).length;
+  const avg = per.reduce((a, x) => a + x.sum, 0) / per.length;
+  const top = per.reduce((a, x) => x.sum > a.sum ? x : a, per[0]);
+  let pmax = 0;
+  for (let t = t0; t < t1; t += STEP) pmax = Math.max(pmax, probAt(r.ds[0], t) ?? 0);
+  return {wetPct:Math.round(wet / per.length * 100), center:per[0].sum, avg, max:top.sum, maxAt:r.pts[top.i], pmax};
+}
+/* values for the map grid at the selected slot */
+function gridValues(r){
+  const c = r.ds[0], ds0 = dayStart(c, sel.day), t = ds0 + sel.slot * STEP, tEnd = t + STEP;
+  if (cfg.grid === 'rate') return {t, vals:r.ds.map(d => { const v = mmAt(d, t); return v == null ? null : v * 4; })};
+  if (cfg.grid === 'cloud') return {t, vals:r.ds.map(d => cloudAt(d, t + STEP / 2))};
+  const from = ds0 + cfg.fromHour * 3600;
+  if (from >= tEnd) return {t, from, vals:null};
+  return {t, from, vals:r.ds.map(d => sumMm(d, from, tEnd))};
+}
+const mmLevel = v => v >= 2 ? 'bad' : v >= WET_PERIOD_MM ? 'warn' : 'good';
+const pctLevel = v => v >= 50 ? 'bad' : v >= 15 ? 'warn' : 'good';
+const fmm = (v, u = 'mm') => (v < 0.05 ? '0' : v < 10 ? v.toFixed(1) : Math.round(v)) + ' ' + u;
+function colorFor(scale, v){
+  let col = null; for (const [lo, c] of SCALES[scale].steps) if (v >= lo) col = c; return col;
+}
+
+/* ---------- rendering ---------- */
+function centerOf(id){ return id === 'home' ? cfg.home : herePos; }
+
+function renderTimeline(){
+  const r = data[sel.loc];
+  $('#tlTitle').textContent = 'Rain chance · ' + NAMES[sel.loc] + ' · ' + (sel.day ? 'Tomorrow' : 'Today');
+  $('#roAccL').textContent = 'Total since ' + hLabel(cfg.fromHour);
+  const svg = $('#chartSvg'), err = $('#chartErr');
+  $('#slot').value = sel.slot; $('#mslot').value = sel.slot;
+  const blank = () => { $('#roPct').className = 'ro-pct'; $('#roPct').innerHTML = '--<small>%</small>';
+    $('#roTime').textContent = '--:--'; ['#roMm','#roAcc','#roCloud'].forEach(s => $(s).textContent = '--'); };
+  if (!r || r.error){ svg.innerHTML = ''; err.textContent = r ? r.error : ''; blank(); return; }
+  err.textContent = '';
+  const c = r.ds[0], s = series(r, sel.day), H = 120, W = 10, top = 6;
+  const y = v => H - v / 100 * (H - top);
+  const parts = ['<rect class="selband" x="' + sel.slot * W + '" y="0" width="' + W + '" height="' + H + '"/>'];
+  s.forEach((x, i) => {
+    const h = Math.max(x.p > 0 ? 1.5 : 0, x.p / 100 * (H - top));
+    parts.push('<rect class="bar ' + x.level + (x.past && sel.day === 0 ? ' past' : '') + '" x="' + (i * W + 1.5) + '" y="' + (H - h) + '" width="' + (W - 3) + '" height="' + h + '"/>');
+  });
+  const ty = y(cfg.threshold);
+  parts.push('<line class="thr" vector-effect="non-scaling-stroke" x1="0" x2="960" y1="' + ty + '" y2="' + ty + '"/>');
+  if (sel.day === 0){
+    const nx = (Date.now() / 1000 - dayStart(c, 0)) / STEP * W;
+    parts.push('<line class="nowl" vector-effect="non-scaling-stroke" x1="' + nx + '" x2="' + nx + '" y1="0" y2="' + H + '"/>');
+  }
+  const sx = sel.slot * W + W / 2;
+  parts.push('<line class="selline" vector-effect="non-scaling-stroke" x1="' + sx + '" x2="' + sx + '" y1="0" y2="' + H + '"/>');
+  svg.innerHTML = parts.join('');
+  const lab = $('#thrLab'); lab.style.top = (ty / H * 100) + '%'; lab.textContent = cfg.threshold + '%';
+
+  const x = s[sel.slot];
+  const when = sel.day ? 'Tomorrow' : (sel.slot === nowSlot(c) ? 'Today · now' : x.past ? 'Today · earlier' : 'Today');
+  $('#roWhen').textContent = 'At ' + NAMES[sel.loc] + ' · ' + when;
+  $('#roTime').textContent = hhmm(c, x.t) + '–' + hhmm(c, x.t + STEP);
+  const pe = $('#roPct'); pe.className = 'ro-pct ' + x.level;
+  pe.innerHTML = (x.has ? x.p : '--') + '<small>%</small>';
+  $('#roSub').textContent = LEVEL_TEXT[x.level] + ' · rain chance';
+  $('#roMm').textContent = x.mm == null ? '--' : fmm(x.mm);
+  const from = dayStart(c, sel.day) + cfg.fromHour * 3600;
+  $('#roAcc').textContent = from >= x.t + STEP ? 'after this slot' : fmm(sumMm(c, from, x.t + STEP));
+  const cc = cloudAt(c, x.t + STEP / 2);
+  $('#roCloud').textContent = cc == null ? '--' : cc + '%';
+  $('#mslotT').textContent = (sel.day ? 'Tmrw ' : '') + hhmm(c, x.t) + '–' + hhmm(c, x.t + STEP);
+}
+
+function outlook(r, hours){
+  const now = Math.floor(Date.now() / 1000), t0 = now - (now % STEP), t1 = t0 + hours * 3600, c = r.ds[0];
+  const P = {pmax:0, pmaxT:t0, total:0, start:null, heavy:0, heavyT:null};
+  for (let t = t0; t < t1; t += STEP){
+    const p = probAt(c, t) ?? 0, mm = mmAt(c, t) ?? 0;
+    if (p > P.pmax){ P.pmax = p; P.pmaxT = t; }
+    P.total += mm;
+    if (P.start == null && mm >= WET_SLOT_MM) P.start = t;
+    if (mm > P.heavy){ P.heavy = mm; P.heavyT = t; }
+  }
+  P.rainingNow = c.current && c.current.precipitation > 0;
+  const per = r.ds.map((d, i) => ({i, sum:sumMm(d, t0, t1), pmax:Math.max(0, ...Array.from({length:hours * 4}, (_, k) => probAt(d, t0 + k * STEP) ?? 0))}));
+  const top = per.reduce((a, x) => x.sum > a.sum ? x : a, per[0]);
+  const ptop = per.reduce((a, x) => x.pmax > a.pmax ? x : a, per[0]);
+  let wetPeak = 0, wetPeakT = t0;
+  for (let t = t0; t < t1; t += STEP){ const w = slotArea(r.ds, t).wet ?? 0; if (w > wetPeak){ wetPeak = w; wetPeakT = t; } }
+  const A = {wetPct:Math.round(per.filter(x => x.sum >= WET_PERIOD_MM).length / per.length * 100),
+    avg:per.reduce((a, x) => a + x.sum, 0) / per.length, max:top.sum, maxAt:r.pts[top.i],
+    pmax:ptop.pmax, pmaxAt:r.pts[ptop.i], wetPeak, wetPeakT};
+  return {P, A, c};
+}
+function renderStats(){
+  const box = $('#stats'), nowRow = $('#nowRow'), note = $('#olNote');
+  box.textContent = ''; nowRow.textContent = ''; note.textContent = '';
+  const name = NAMES[sel.loc], place = sel.loc === 'home' ? 'home' : 'your location', h = cfg.hours + (cfg.hours === 1 ? ' hour' : ' hours');
+  $('#olTitle').textContent = 'Next ' + h + ' · ' + name;
+  $('#scPoint').textContent = 'At ' + name;
+  $('#scArea').textContent = cfg.radius + ' km around';
+  $$('[data-scope]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.scope === cfg.scope)));
+  const r = data[sel.loc];
+  if (!r || r.error){ const p = document.createElement('p'); p.className = r ? 'err' : 'note'; p.textContent = r ? r.error : 'Loading forecast…'; box.append(p); return; }
+  const {P, A, c} = outlook(r, cfg.hours), tm = t => hhmm(c, t);
+  let items;
+  if (cfg.scope === 'point'){
+    const lab = document.createElement('span'); lab.textContent = 'Rain chance'; nowRow.append(lab);
+    for (const x of nextHour(c)){
+      const w = document.createElement('span'); w.className = 'nw';
+      w.append(document.createTextNode(x.k === 0 ? 'now' : x.k === 30 ? '30 min' : '1 h'));
+      const ch = document.createElement('span'); ch.className = 'chip ' + x.level; ch.textContent = x.raining ? 'Rain' : x.p + '%';
+      w.append(ch); nowRow.append(w);
+    }
+    items = [
+      {lvl:levelFor(P.pmax), k:'Highest rain chance', s:P.pmax ? 'at ' + tm(P.pmaxT) : 'whole period', v:P.pmax + '%'},
+      {lvl:mmLevel(P.total), k:'Rain expected', s:'total at ' + place + ', next ' + h, v:fmm(P.total)},
+      {lvl:P.rainingNow ? 'bad' : P.start ? 'warn' : 'good', k:'Rain starts', s:P.rainingNow ? 'it is raining now' : P.start ? 'first wet 15 minutes' : 'no rain in this period', v:P.rainingNow ? 'now' : P.start ? tm(P.start) : '—'},
+      {lvl:mmLevel(P.heavy * 4), k:'Heaviest 15 minutes', s:P.heavyT ? tm(P.heavyT) + '–' + tm(P.heavyT + STEP) : 'no rain in this period', v:fmm(P.heavy)}
+    ];
+    note.textContent = 'Values at ' + place + ' only.';
+  } else {
+    items = [
+      {lvl:pctLevel(A.wetPct), k:'Area that gets wet', s:'gets ≥ ' + WET_PERIOD_MM + ' mm in the next ' + h, v:A.wetPct + '%'},
+      {lvl:mmLevel(A.avg), k:'Average rain', s:'total per spot, next ' + h, v:fmm(A.avg)},
+      {lvl:mmLevel(A.max), k:'Wettest spot', s:A.max >= 0.05 ? 'total, ' + dirOf(A.maxAt) : 'no rain expected', v:fmm(A.max)},
+      {lvl:levelFor(A.pmax), k:'Highest rain chance', s:A.pmax ? dirOf(A.pmaxAt) : 'whole area', v:A.pmax + '%'},
+      {lvl:pctLevel(A.wetPeak), k:'Most of area raining at once', s:A.wetPeak ? 'at ' + tm(A.wetPeakT) : 'no rain in this period', v:A.wetPeak + '%'}
+    ];
+    note.textContent = 'Values across ' + cfg.radius + ' km around ' + place + ' (' + r.pts.length + ' forecast points).';
+  }
+  items.sort((a, b) => RANK[b.lvl] - RANK[a.lvl]);
+  for (const it of items){
+    const row = document.createElement('div'); row.className = 'stat ' + it.lvl;
+    const dot = document.createElement('span'); dot.className = 'dot';
+    const k = document.createElement('div'); k.className = 'k'; k.textContent = it.k;
+    const sm = document.createElement('small'); sm.textContent = it.s; k.append(sm);
+    const v = document.createElement('div'); v.className = 'v'; v.textContent = it.v;
+    row.append(dot, k, v); box.append(row);
+  }
+}
+$$('[data-scope]').forEach(b => b.addEventListener('click', () => { cfg.scope = b.dataset.scope; save(); renderStats(); }));
+
+function renderHours(){
+  const h = $('#hours'); h.textContent = '';
+  for (let k = 0; k <= 24; k += 3){
+    const sp = document.createElement('span');
+    sp.style.left = (k / 24 * 100) + '%';
+    sp.textContent = hLabel(k);
+    if (k % 6) sp.className = 'minor';
+    h.append(sp);
+  }
+}
+
+function handleAlerts(){
+  const box = $('#alerts'); box.textContent = '';
+  for (const id of ['here', 'home']){
+    const r = data[id];
+    if (!r || r.error) continue;
+    const red = nextHour(r.ds[0]).filter(x => x.level === 'bad');
+    if (!red.length){ delete cfg.notif[id]; continue; }
+    const body = red.map(x => (x.k === 0 ? 'now' : 'in ' + (x.k === 60 ? '1 hour' : '30 min')) + ' ' + (x.raining ? 'raining' : x.p + '%')).join(', ');
+    const a = document.createElement('div'); a.className = 'alert';
+    a.textContent = NAMES[id] + ': rain ' + body;
+    box.append(a);
+    if (Date.now() - (cfg.notif[id] || 0) > COOLDOWN_MS){
+      cfg.notif[id] = Date.now();
+      if ('Notification' in window && Notification.permission === 'granted'){ try { new Notification('Rain: ' + NAMES[id], {body}); } catch {} }
+    }
+  }
+  save();
+}
+function renderSlot(){ renderTimeline(); drawGrid(); }
+function renderAll(){ renderTimeline(); renderStats(); drawArea(); syncHomeBox(); }
+
+let busy = false, again = false;
+async function loadOne(id, posFn){
+  try { const c = await posFn(); const pts = samplePoints(c, cfg.radius); const ds = await getForecast(pts); data[id] = {ds, pts, c}; }
+  catch (e) { data[id] = {error:e.message || 'Could not load forecast'}; }
+}
+async function refresh(){
+  if (busy){ again = true; return; }
+  busy = true; lastRefresh = Date.now();
+  $('#stamp').textContent = 'Updating…';
+  await Promise.all([loadOne('here', () => getHere(false)), loadOne('home', async () => cfg.home)]);
+  const r = data[sel.loc];
+  if (!slotTouched && sel.day === 0 && r && r.ds) sel.slot = nowSlot(r.ds[0]);
+  renderAll(); handleAlerts();
+  $('#stamp').textContent = 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  busy = false;
+  if (again){ again = false; refresh(); }
+}
+
+/* ---------- controls ---------- */
+function pickSlot(i){ stopFPlay(); sel.slot = Math.max(0, Math.min(SLOTS - 1, i)); slotTouched = true; renderSlot(); }
+$('#slot').addEventListener('input', e => pickSlot(+e.target.value));
+$('#mslot').addEventListener('input', e => pickSlot(+e.target.value));
+const chart = $('#chart');
+function chartPick(e){ const b = chart.getBoundingClientRect(); pickSlot(Math.floor((e.clientX - b.left) / b.width * SLOTS)); }
+chart.addEventListener('pointerdown', e => { chart.setPointerCapture(e.pointerId); chartPick(e); });
+chart.addEventListener('pointermove', e => { if (e.buttons) chartPick(e); });
+
+$$('[data-day]').forEach(b => b.addEventListener('click', () => {
+  sel.day = +b.dataset.day;
+  $$('[data-day]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  const r = data[sel.loc];
+  if (sel.day === 0 && r && r.ds){ sel.slot = nowSlot(r.ds[0]); slotTouched = false; }
+  renderSlot();
+}));
+$$('[data-loc]').forEach(b => b.addEventListener('click', () => {
+  sel.loc = b.dataset.loc;
+  $$('[data-loc]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  renderTimeline(); renderStats(); drawArea(true);
+}));
+function setTab(t){
+  cfg.tab = t; save();
+  $$('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+  $('#view-data').hidden = t !== 'data';
+  $('#view-settings').hidden = t !== 'settings';
+  if (t === 'data'){ if (!map) initMap(); else { map.invalidateSize(); } }
+}
+$$('[data-tab]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+function fillFrom(){
+  for (const id of ['#fromSel', '#fromSel2']){
+    const s = $(id); s.textContent = '';
+    for (let h = 0; h < 24; h++){ const o = document.createElement('option'); o.value = h; o.textContent = h === 0 ? '00:00 (start of day)' : hLabel(h); s.append(o); }
+    s.value = cfg.fromHour;
+  }
+  $('#fromSel').options[0].textContent = '00:00';
+}
+$$('#fromSel, #fromSel2').forEach(s => s.addEventListener('change', e => {
+  cfg.fromHour = +e.target.value; save();
+  $('#fromSel').value = cfg.fromHour; $('#fromSel2').value = cfg.fromHour;
+  renderSlot();
+}));
+function syncRadius(){ $$('.radiusSel').forEach(s => s.value = cfg.radius); }
+$$('.radiusSel').forEach(s => s.addEventListener('change', e => {
+  cfg.radius = +e.target.value; save(); syncRadius(); areaFitted = false; drawArea(true); refresh();
+}));
+$('#hoursSel').value = cfg.hours;
+$('#hoursSel').addEventListener('change', e => { cfg.hours = +e.target.value; save(); renderStats(); });
+
+function syncHomeBox(){ $('#homeBox').textContent = cfg.home.lat.toFixed(5) + ', ' + cfg.home.lon.toFixed(5); }
+function setHome(lat, lon){
+  cfg.home = {lat:+lat.toFixed(5), lon:+lon.toFixed(5)};
+  delete cfg.notif.home; save(); syncHomeBox(); drawHome();
+  /* update home on its own, without waiting for the location fix */
+  data.home = null; if (sel.loc === 'home'){ drawArea(); }
+  loadOne('home', async () => cfg.home).then(() => { renderAll(); handleAlerts(); });
+}
+function syncSettings(){
+  $('#thr').value = cfg.threshold; $('#thrVal').textContent = cfg.threshold + '%';
+  syncHomeBox(); syncRadius();
+  const n = $('#notifNote'), b = $('#notifBtn');
+  if (!('Notification' in window)){ b.hidden = true; n.textContent = 'No notification support in this browser. Alerts show at the top of the page.'; return; }
+  if (Notification.permission === 'granted'){ b.hidden = true; n.textContent = 'Notifications on. Keep this page open (a pinned tab works).'; }
+  else if (Notification.permission === 'denied'){ b.hidden = true; n.textContent = 'Notifications are blocked for this page in the browser settings.'; }
+  else { b.hidden = false; n.textContent = 'Alerts always show at the top. Enable notifications for pop-ups.'; }
+}
+$('#thr').addEventListener('input', e => { cfg.threshold = +e.target.value; $('#thrVal').textContent = cfg.threshold + '%'; save(); renderTimeline(); renderStats(); });
+$('#thr').addEventListener('change', handleAlerts);
+$('#hereAsHome').addEventListener('click', () => { if (herePos) setHome(herePos.lat, herePos.lon); });
+$('#placeHome2').addEventListener('click', () => { setTab('data'); $('#mapwrap').scrollIntoView({behavior:'smooth', block:'center'}); setPlacing(true); if (map) map.flyTo([cfg.home.lat, cfg.home.lon], 12); });
+$('#notifBtn').addEventListener('click', async () => { try { await Notification.requestPermission(); } catch {} syncSettings(); });
+$('#refresh').addEventListener('click', refresh);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastRefresh > REFRESH_MS) refresh(); });
+
+/* ---------- map ---------- */
+const fmtT = d => d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+const SRC = {
+  radar:'Radar · RainViewer observed rain, last 2 hours. Coarse detail when zoomed in.',
+  off:''
+};
+const BASES = [
+  {url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', attribution:'Tiles © Esri'},
+  {url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attribution:'Imagery © Esri'},
+  {url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', subdomains:'abc', maxNativeZoom:17, attribution:'© OpenStreetMap contributors, © OpenTopoMap'}
+];
+let map = null, baseLayer = null, meDot = null, meAcc = null, homePin = null, areaCircle = null;
+let frames = [], fi = 0, timer = null, mapOpacity = 0.7, buildToken = 0, placing = false, areaFitted = false, lastRefresh = 0;
+
+function addBase(i){
+  if (i >= BASES.length) return;
+  if (baseLayer) map.removeLayer(baseLayer);
+  const b = BASES[i]; let errors = 0, loaded = 0;
+  baseLayer = L.tileLayer(b.url, {maxZoom:19, maxNativeZoom:b.maxNativeZoom || 19, subdomains:b.subdomains || 'abc', attribution:b.attribution, zIndex:0});
+  baseLayer.on('tileload', () => { loaded++; });
+  baseLayer.on('tileerror', () => { if (++errors >= 4 && loaded === 0) addBase(i + 1); });
+  baseLayer.addTo(map);
+}
+function initMap(){
+  if (typeof L === 'undefined'){ $('#gsum').textContent = 'The map library could not load. Check your connection.'; return; }
+  const c = centerOf(sel.loc) || cfg.home;
+  map = L.map('map', {zoomSnap:0.5, zoomControl:false}).setView([c.lat, c.lon], 10);
+  L.control.zoom({position:'topright'}).addTo(map);
+  map.createPane('grid'); map.getPane('grid').style.zIndex = 440;
+  map.createPane('area'); map.getPane('area').style.zIndex = 450;
+  addBase(0);
+  const hv = $('#hoverVal');
+  const showVal = e => {
+    const f = fieldValueAt(e.latlng);
+    if (!f || placing){ hv.hidden = true; return; }
+    hv.textContent = fvalOf(lastField.sc, f.v) + ' · ' + dirOf(f.p);
+    hv.style.left = e.containerPoint.x + 'px'; hv.style.top = e.containerPoint.y + 'px'; hv.hidden = false;
+  };
+  map.on('mousemove', showVal);
+  map.on('mouseout', () => { hv.hidden = true; });
+  map.on('click', e => { if (placing){ setPlacing(false); setHome(e.latlng.lat, e.latlng.lng); } else showVal(e); });
+  drawHome(); drawMe(); drawArea(true);
+  syncLayerButtons(); buildFrames();
+}
+function drawHome(){
+  if (!map) return;
+  const ll = [cfg.home.lat, cfg.home.lon];
+  if (homePin){ homePin.setLatLng(ll); return; }
+  const icon = L.divIcon({className:'pin-wrap', html:'<div class="pin-home"></div>', iconSize:[22,22], iconAnchor:[11,26]});
+  homePin = L.marker(ll, {icon, draggable:true, zIndexOffset:1000, title:'Home (drag to move)'}).addTo(map);
+  homePin.bindTooltip('Home · drag to move', {direction:'top', offset:[0,-24]});
+  homePin.on('drag', () => { if (sel.loc === 'home' && areaCircle){ areaCircle.setLatLng(homePin.getLatLng()); clearField(); } });
+  homePin.on('dragend', () => { const p = homePin.getLatLng(); setHome(p.lat, p.lng); });
+}
+function drawMe(){
+  const info = $('#youInfo');
+  if (herePos) info.textContent = 'You: ' + herePos.lat.toFixed(5) + ', ' + herePos.lon.toFixed(5) +
+    (hereAcc ? ' · ±' + (hereAcc >= 1000 ? (hereAcc / 1000).toFixed(1) + ' km' : Math.round(hereAcc) + ' m') : '');
+  if (!map || !herePos) return;
+  const ll = [herePos.lat, herePos.lon];
+  if (meDot){ meDot.setLatLng(ll); meAcc.setLatLng(ll).setRadius(hereAcc || 0); }
+  else {
+    meAcc = L.circle(ll, {radius:hereAcc || 0, color:'#0a62c9', weight:1, fillColor:'#0a62c9', fillOpacity:0.12, interactive:false, pane:'area'}).addTo(map);
+    meDot = L.circleMarker(ll, {radius:8, color:'#ffffff', weight:3, fillColor:'#0a62c9', fillOpacity:1, pane:'area'}).addTo(map).bindTooltip('You are here');
+  }
+  if (sel.loc === 'here') drawArea();
+}
+function drawArea(fit){
+  if (!map) return;
+  const d = data[sel.loc], c = (d && d.c) || centerOf(sel.loc);
+  if (areaCircle){ map.removeLayer(areaCircle); areaCircle = null; }
+  if (c){
+    areaCircle = L.circle([c.lat, c.lon], {radius:cfg.radius * 1000, color:'#0a62c9', weight:2, dashArray:'6 6', fill:false, interactive:false, pane:'area'}).addTo(map);
+    if (fit || !areaFitted){
+      areaFitted = true;
+      const bottom = ($('.mo-b').offsetHeight || 120) + 40, topPad = ($('.mo-tl').offsetHeight || 90) + 30;
+      map.flyToBounds(areaCircle.getBounds(), {paddingTopLeft:[40, topPad], paddingBottomRight:[40, bottom], duration:0.6});
+    }
+  }
+  drawGrid();
+}
+/* ---------- smooth forecast field ---------- */
+const fieldCanvas = document.createElement('canvas');
+let fieldOverlay = null, lastField = null;
+const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+function rgbaFor(sc, v){
+  const st = SCALES[sc].steps, alpha = sc === 'cloud' ? 0.6 : 0.68;
+  const lo0 = st[0][0];
+  if (v < lo0 * 0.4) return null;
+  if (v < lo0){ const [r, g, b] = hex2rgb(st[0][1]); return [r, g, b, alpha * (v - lo0 * 0.4) / (lo0 * 0.6)]; }
+  for (let i = 0; i < st.length - 1; i++){
+    const [a, ca] = st[i], [b, cb] = st[i + 1];
+    if (v < b){
+      const f = (v - a) / (b - a), A = hex2rgb(ca), B = hex2rgb(cb);
+      return [A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f, A[2] + (B[2] - A[2]) * f, alpha];
+    }
+  }
+  const [r, g, b] = hex2rgb(st[st.length - 1][1]); return [r, g, b, alpha];
+}
+function idw(P, s2, x, y){
+  let sw = 0, sv = 0;
+  /* Gaussian blend: s2 is 2*sigma^2; tiny floor keeps far pixels defined */
+  for (const q of P){ const dd = (x - q[0]) ** 2 + (y - q[1]) ** 2; const w = Math.exp(-dd / s2) + 1e-9; sw += w; sv += w * q[2]; }
+  return sv / sw;
+}
+function renderField(r, vals, sc){
+  const N = 180, R = cfg.radius, pts = r.pts, s2 = 2 * (pts.step * 0.75) ** 2;
+  const P = pts.map((p, i) => [p.dx, p.dy, vals[i]]).filter(q => q[2] != null);
+  fieldCanvas.width = N; fieldCanvas.height = N;
+  const ctx = fieldCanvas.getContext('2d'), img = ctx.createImageData(N, N), D = img.data;
+  for (let py = 0; py < N; py++){
+    const y = R - (py + 0.5) / N * 2 * R;
+    for (let px = 0; px < N; px++){
+      const x = -R + (px + 0.5) / N * 2 * R, d = Math.hypot(x, y);
+      if (d > R) continue;
+      const c = rgbaFor(sc, idw(P, s2, x, y));
+      if (!c) continue;
+      const edge = Math.min(1, (R - d) / (R * 0.06)), k = (py * N + px) * 4;
+      D[k] = c[0]; D[k + 1] = c[1]; D[k + 2] = c[2]; D[k + 3] = Math.round(c[3] * edge * 255);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const c0 = r.c, bounds = [[c0.lat - R * pts.kLat, c0.lon - R * pts.kLon], [c0.lat + R * pts.kLat, c0.lon + R * pts.kLon]];
+  const url = fieldCanvas.toDataURL();
+  if (fieldOverlay){ fieldOverlay.setUrl(url); fieldOverlay.setBounds(L.latLngBounds(bounds)); }
+  else fieldOverlay = L.imageOverlay(url, bounds, {pane:'grid', interactive:false}).addTo(map);
+  lastField = {r, P, s2, sc, R};
+  drawContours(r, P, s2, sc);
+}
+function clearField(){ if (fieldOverlay){ map.removeLayer(fieldOverlay); fieldOverlay = null; } lastField = null; if (contourLayer) contourLayer.clearLayers(); if (centerLabel){ map.removeLayer(centerLabel); centerLabel = null; } }
+let centerLabel = null;
+function drawCenterLabel(r, txt){
+  const html = '<span>' + txt.replace(/[<>&]/g, '') + '</span>';
+  const icon = L.divIcon({className:'cval', html, iconSize:[0, 0]});
+  if (centerLabel){ centerLabel.setLatLng([r.c.lat, r.c.lon]); centerLabel.setIcon(icon); }
+  else centerLabel = L.marker([r.c.lat, r.c.lon], {icon, pane:'area', interactive:false, keyboard:false, zIndexOffset:2000}).addTo(map);
+}
+
+/* contour lines (marching squares) with value labels */
+let contourLayer = null;
+const MS = {1:[[3,0]],2:[[0,1]],3:[[3,1]],4:[[1,2]],5:[[3,2],[0,1]],6:[[0,2]],7:[[3,2]],8:[[2,3]],9:[[0,2]],10:[[0,3],[1,2]],11:[[1,2]],12:[[1,3]],13:[[0,1]],14:[[0,3]]};
+function drawContours(r, P, s2, sc){
+  if (!contourLayer) contourLayer = L.layerGroup().addTo(map);
+  contourLayer.clearLayers();
+  const R = cfg.radius, pts = r.pts, c0 = r.c, M = 56, h = 2 * R / M;
+  const V = [];
+  let vmin = Infinity, vmax = -Infinity;
+  for (let j = 0; j <= M; j++){ const row = []; for (let i = 0; i <= M; i++){
+    const x = -R + i * h, y = -R + j * h;
+    if (Math.hypot(x, y) > R * 0.985){ row.push(NaN); continue; }
+    const v = idw(P, s2, x, y); row.push(v); if (v < vmin) vmin = v; if (v > vmax) vmax = v;
+  } V.push(row); }
+  const toLL = (x, y) => [c0.lat + y * pts.kLat, c0.lon + x * pts.kLon];
+  const labels = [];
+  for (const [L0] of SCALES[sc].steps){
+    if (L0 <= vmin || L0 >= vmax) continue;
+    const segs = [];
+    for (let j = 0; j < M; j++) for (let i = 0; i < M; i++){
+      const a = V[j][i], b = V[j][i + 1], cc = V[j + 1][i + 1], d = V[j + 1][i];
+      if (isNaN(a) || isNaN(b) || isNaN(cc) || isNaN(d)) continue;
+      const k = (a >= L0) | (b >= L0) << 1 | (cc >= L0) << 2 | (d >= L0) << 3;
+      const cases = MS[k]; if (!cases) continue;
+      const x0 = -R + i * h, y0 = -R + j * h, t = (p, q) => (L0 - p) / (q - p);
+      const E = [
+        () => [x0 + h * t(a, b), y0],
+        () => [x0 + h, y0 + h * t(b, cc)],
+        () => [x0 + h * t(d, cc), y0 + h],
+        () => [x0, y0 + h * t(a, d)]
+      ];
+      for (const [e1, e2] of cases) segs.push([E[e1](), E[e2]()]);
+    }
+    if (!segs.length) continue;
+    L.polyline(segs.map(sg => [toLL(...sg[0]), toLL(...sg[1])]), {pane:'grid', color:'#0f1b2a', weight:1.3, opacity:0.55, interactive:false}).addTo(contourLayer);
+    /* up to two labels per level, spread apart */
+    const mids = segs.map(sg => [(sg[0][0] + sg[1][0]) / 2, (sg[0][1] + sg[1][1]) / 2]);
+    let cand = mids.filter(q => Math.hypot(q[0], q[1]) < R * 0.78); if (!cand.length) cand = mids;
+    const first = cand.reduce((m, q) => Math.abs(Math.hypot(q[0], q[1]) - R * 0.5) < Math.abs(Math.hypot(m[0], m[1]) - R * 0.5) ? q : m);
+    const second = cand.reduce((m, q) => Math.hypot(q[0] - first[0], q[1] - first[1]) > Math.hypot(m[0] - first[0], m[1] - first[1]) ? q : m);
+    const order = [first, second];
+    for (const q of order){
+      if (labels.some(l => Math.hypot(l[0] - q[0], l[1] - q[1]) < R * 0.3)) continue;
+      labels.push(q);
+      const txt = sc === 'cloud' ? L0 + '%' : L0 + ' ' + SCALES[sc].unit;
+      L.marker(toLL(q[0], q[1]), {pane:'area', interactive:false, keyboard:false,
+        icon:L.divIcon({className:'clab', html:'<span>' + txt + '</span>', iconSize:[0, 0]})}).addTo(contourLayer);
+    }
+  }
+}
+function fieldValueAt(ll){
+  if (!lastField) return null;
+  const {r, P, s2, R} = lastField, pts = r.pts;
+  const y = (ll.lat - r.c.lat) / pts.kLat, x = (ll.lng - r.c.lon) / pts.kLon;
+  if (Math.hypot(x, y) > R) return null;
+  return {v:idw(P, s2, x, y), p:{dx:x, dy:y}};
+}
+const fvalOf = (sc, v) => sc === 'cloud' ? Math.round(v) + '%' : fmm(v, SCALES[sc].unit);
+
+function drawGrid(){
+  if (!map) return;
+  $('#fromWrap').hidden = cfg.grid !== 'total';
+  renderScale();
+  const r = data[sel.loc], sum = $('#gsum');
+  if (!r || r.error){ clearField(); sum.textContent = r ? r.error : 'Loading forecast…'; return; }
+  const g = gridValues(r), c = r.ds[0], pts = r.pts, sc = cfg.grid;
+  const tEnd = g.t + STEP, when = (sel.day ? 'tomorrow ' : '') + hhmm(c, g.t) + '–' + hhmm(c, tEnd);
+  if (!g.vals){ clearField(); sum.textContent = 'Move the slider past ' + hLabel(cfg.fromHour) + ' to see the total.'; return; }
+  renderField(r, g.vals, sc);
+  const fval = v => fvalOf(sc, v);
+  const cv = g.vals[0] ?? 0;
+  drawCenterLabel(r, NAMES[sel.loc] + ' · ' + (sc === 'rate' ? fval(cv) : sc === 'total' ? fval(cv) + ' since ' + hLabel(cfg.fromHour) : 'cloud ' + fval(cv)));
+  const valid = g.vals.map((v, i) => ({v, i})).filter(x => x.v != null);
+  if (!valid.length){ sum.textContent = 'No forecast for this time.'; return; }
+  const avg = valid.reduce((a, x) => a + x.v, 0) / valid.length;
+  const top = valid.reduce((a, x) => x.v > a.v ? x : a, valid[0]);
+  sum.textContent = '';
+  const add = (k, v) => { const s = document.createElement('span'); s.textContent = k + ' '; const b = document.createElement('b'); b.textContent = v; s.append(b); sum.append(s); };
+  if (sc === 'cloud'){
+    const low = valid.reduce((a, x) => x.v < a.v ? x : a, valid[0]);
+    add(NAMES[sel.loc], fval(g.vals[0] ?? 0));
+    add('Area avg', fval(avg));
+    add('Clearest', fval(low.v) + ' · ' + dirOf(pts[low.i]));
+    return;
+  }
+  const wetCut = sc === 'rate' ? WET_SLOT_MM * 4 : WET_PERIOD_MM;
+  const wet = Math.round(valid.filter(x => x.v >= wetCut).length / valid.length * 100);
+  add(NAMES[sel.loc], fval(g.vals[0] ?? 0));
+  add('Area avg', fval(avg));
+  add('Max', fval(top.v) + (top.v >= 0.05 ? ' · ' + dirOf(pts[top.i]) : ''));
+  add('Wet', wet + '% of ' + cfg.radius + ' km');
+}
+function renderScale(){
+  const box = $('#scale'); box.textContent = '';
+  const sc = SCALES[cfg.grid], st = sc.steps;
+  const l = document.createElement('span'); l.className = 'sl'; l.textContent = sc.label; box.append(l);
+  const bar = document.createElement('div'); bar.className = 'bar2';
+  const i = document.createElement('i');
+  i.style.background = 'linear-gradient(90deg,' + st.map((s, k) => s[1] + ' ' + (k / (st.length - 1) * 100) + '%').join(',') + ')';
+  bar.append(i);
+  st.forEach((s, k) => { const t = document.createElement('span'); t.textContent = s[0]; t.style.left = (k / (st.length - 1) * 100) + '%';
+    if (k === 0) t.style.transform = 'none'; if (k === st.length - 1) t.style.transform = 'translateX(-100%)'; bar.append(t); });
+  box.append(bar);
+}
+function setPlacing(on){
+  placing = on;
+  $('#placeHint').hidden = !on;
+  const m = document.getElementById('map'); if (m) m.classList.toggle('placing', on);
+}
+function syncLayerButtons(){
+  $$('[data-grid]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.grid === cfg.grid)));
+  $('#radarBtn').setAttribute('aria-pressed', String(cfg.sky === 'radar'));
+  $('#skyRow').hidden = cfg.sky === 'off';
+}
+
+/* forecast playback */
+let fTimer = null;
+function stopFPlay(){ if (fTimer){ clearInterval(fTimer); fTimer = null; } const b = $('#fPlay'); b.textContent = '▶'; b.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-label', 'Play forecast'); }
+$('#fPlay').addEventListener('click', () => {
+  if (fTimer){ stopFPlay(); return; }
+  const b = $('#fPlay'); b.textContent = '❚❚'; b.setAttribute('aria-pressed', 'true'); b.setAttribute('aria-label', 'Pause forecast');
+  const r = data[sel.loc], start = sel.day === 0 && r && r.ds ? nowSlot(r.ds[0]) : 0;
+  if (sel.slot >= SLOTS - 1) sel.slot = start - 1;
+  fTimer = setInterval(() => {
+    let n = sel.slot + 1; if (n >= SLOTS) n = start;
+    sel.slot = n; slotTouched = true; renderSlot();
+  }, 450);
+});
+
+/* radar (observed, past) */
+function stopPlay(){ if (timer){ clearInterval(timer); timer = null; } $('#mapPlay').textContent = '▶'; }
+function setFrame(i){
+  if (!frames.length) return;
+  fi = Math.max(0, Math.min(frames.length - 1, i));
+  frames.forEach((f, j) => f.layer.setOpacity(j === fi ? mapOpacity : 0));
+  $('#mapSlide').value = fi; $('#mapTime').textContent = frames[fi].label;
+}
+async function buildFrames(){
+  const token = ++buildToken;
+  stopPlay(); frames.forEach(f => map.removeLayer(f.layer)); frames = [];
+  $('#mapTime').textContent = '–';
+  if (cfg.sky === 'off') return;
+  let list = [];
+  try {
+    const r = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    list = (j.radar.past || []).slice(-12).map(f => ({label:fmtT(new Date(f.time * 1000)),
+      layer:L.tileLayer(j.host + f.path + '/256/{z}/{x}/{y}/2/1_0.png', {opacity:0, maxNativeZoom:7, maxZoom:19, attribution:'RainViewer', zIndex:5})}));
+  } catch (e) { $('#mapTime').textContent = 'unavailable'; return; }
+  if (token !== buildToken) return;
+  frames = list; frames.forEach(f => f.layer.addTo(map));
+  $('#mapSlide').max = frames.length - 1; setFrame(frames.length - 1);
+}
+$('#radarBtn').addEventListener('click', () => { cfg.sky = cfg.sky === 'radar' ? 'off' : 'radar'; save(); syncLayerButtons(); if (map) buildFrames(); });
+$$('[data-grid]').forEach(b => b.addEventListener('click', () => { cfg.grid = b.dataset.grid; save(); syncLayerButtons(); drawGrid(); }));
+$('#mapPlay').addEventListener('click', () => {
+  if (timer){ stopPlay(); return; }
+  if (frames.length < 2) return;
+  $('#mapPlay').textContent = '❚❚';
+  timer = setInterval(() => setFrame(fi + 1 >= frames.length ? 0 : fi + 1), 700);
+});
+$('#mapSlide').addEventListener('input', e => { stopPlay(); setFrame(+e.target.value); });
+$('#mapLocate').addEventListener('click', () => {
+  $('#youInfo').textContent = 'Locating…';
+  getHere(true).then(p => { if (map) map.flyTo([p.lat, p.lon], 11); }).catch(e => { $('#youInfo').textContent = e.message; });
+});
+function setFs(on){
+  const w = $('#mapwrap'); w.classList.toggle('fs', on);
+  $('#mapFs').setAttribute('aria-pressed', String(on)); $('#mapFs').textContent = on ? '✕' : '⤢';
+  document.body.style.overflow = on ? 'hidden' : '';
+  if (map) setTimeout(() => { map.invalidateSize(); drawArea(true); }, 50);
+}
+$('#mapFs').addEventListener('click', () => setFs(!$('#mapwrap').classList.contains('fs')));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#mapwrap').classList.contains('fs')) setFs(false); });
+$('#mapHome').addEventListener('click', () => { if (map) map.flyTo([cfg.home.lat, cfg.home.lon], 11); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && placing) setPlacing(false); });
+
+/* ---------- start ---------- */
+renderHours();
+fillFrom();
+syncSettings();
+setTab(cfg.tab === 'settings' ? 'settings' : 'data');
+refresh();
+setInterval(() => { if (!document.hidden) refresh(); }, REFRESH_MS);
+setInterval(() => { if (map && frames.length && !timer) buildFrames(); }, 10 * 60e3);
+</script>
+</body>
+</html>
