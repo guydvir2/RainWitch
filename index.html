@@ -256,7 +256,7 @@ body:not(.geek) .mapwrap{height:calc(100dvh - var(--dock,70px) - 84px);min-heigh
 <header class="top">
   <div class="brand">
     <svg viewBox="-2 -3 46 37" aria-hidden="true"><path d="M3 29 L40 16" stroke="#6b4a1e" stroke-width="2.4" stroke-linecap="round"/><path d="M7 27.6 L-1 22.5 L-1 33 Z" fill="#c9962f"/><path d="M5 27.6 L-1 27.8" stroke="#8a6416" stroke-width=".9"/><path d="M19 22 Q11 20 7 25 Q15 25.5 20 25 Z" fill="var(--accent)" opacity=".55"/><path d="M19 23 Q20 13 27 12.5 Q31 17 30 21.5 Z" fill="#3b2a6b"/><circle cx="28.6" cy="9" r="3" fill="#f1c9a5"/><path d="M24.2 8.6 L30.2 -1.5 L33.6 8.6 Z" fill="#241b3d"/><ellipse cx="28.8" cy="8.7" rx="6.6" ry="1.4" fill="#241b3d"/><path d="M25 22 L31 19.8 L32 23" stroke="#241b3d" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <div><b>Rain Witch <span style="font:500 .65rem var(--mono);color:var(--muted)">v0.3</span></b><small id="stamp">Loading…</small></div>
+    <div><b>Rain Witch <span style="font:500 .65rem var(--mono);color:var(--muted)">v0.4</span></b><small id="stamp">Loading…</small></div>
   </div>
   <button id="refresh" type="button" class="btn">Refresh</button>
   <button id="menuBtn" type="button" class="menu" aria-label="Settings" aria-expanded="false"><span></span><span></span><span></span></button>
@@ -353,7 +353,7 @@ body:not(.geek) .mapwrap{height:calc(100dvh - var(--dock,70px) - 84px);min-heigh
       <div class="pb set">
         <label class="tog"><span class="tl"><b>Human</b><i>map only</i></span>
           <input id="geekTog" type="checkbox" role="switch"><span class="sw" aria-hidden="true"></span>
-          <span class="tl"><b>Geek</b><i>radar, area stats, 12 h chart</i></span></label>
+          <span class="tl"><b>Geek</b><i>radar, area statistics</i></span></label>
       </div>
     </section>
 
@@ -548,13 +548,9 @@ function slotArea(ds, t){
   for (const d of ds){ const v = mmAt(d, t); if (v == null) continue; n++; if (v >= WET_SLOT_MM) wet++; if (v > max) max = v; }
   return {wet:n ? Math.round(wet / n * 100) : null, max};
 }
-const WIN = 48;  /* chart window: 12 hours */
+const WIN = SLOTS;  /* chart: always the whole day, 00:00-24:00 */
 let chartT0 = 0;
-function chartWindow(c){
-  const now = Math.floor(Date.now() / 1000), base = sel.day === 0 ? now - (now % STEP) : dayStart(c, 1);
-  const selT = dayStart(c, sel.day) + sel.slot * STEP;
-  return base + Math.floor((selT - base) / (WIN * STEP)) * WIN * STEP;
-}
+function chartWindow(c){ return dayStart(c, sel.day); }
 function series(r, s){
   const c = r.ds[0], now = Date.now() / 1000;
   return Array.from({length:WIN}, (_, i) => {
@@ -610,7 +606,7 @@ function renderTimeline(){
   err.textContent = '';
   const c = r.ds[0], t0 = chartT0 = chartWindow(c), s = series(r, t0), H = 120, W = 960 / WIN, top = 6;
   const si = Math.round((dayStart(c, sel.day) + sel.slot * STEP - t0) / STEP);
-  $('#tlTitle').textContent = 'Rain chance · ' + NAMES[sel.loc] + ' · ' + hhmm(c, t0) + '–' + hhmm(c, t0 + WIN * STEP);
+  $('#tlTitle').textContent = 'Rain chance · ' + NAMES[sel.loc] + ' · ' + (sel.day ? 'Tomorrow' : 'Today') + ' 00:00–24:00';
   renderHours(c, t0);
   const y = v => H - v / 100 * (H - top);
   const parts = ['<rect class="selband" x="' + si * W + '" y="0" width="' + W + '" height="' + H + '"/>'];
@@ -726,11 +722,11 @@ $$('[data-scope]').forEach(b => b.addEventListener('click', () => { cfg.scope = 
 
 function renderHours(c, t0){
   const h = $('#hours'); h.textContent = '';
-  for (let k = 0; k <= 12; k += 2){
+  for (let k = 0; k <= 24; k += 3){
     const sp = document.createElement('span');
-    sp.style.left = (k / 12 * 100) + '%';
-    sp.textContent = hhmm(c, t0 + k * 3600);
-    if (k % 4) sp.className = 'minor';
+    sp.style.left = (k / 24 * 100) + '%';
+    sp.textContent = hLabel(k);
+    if (k % 6) sp.className = 'minor';
     h.append(sp);
   }
 }
