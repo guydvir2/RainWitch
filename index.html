@@ -240,11 +240,7 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
 <header class="top">
   <div class="brand">
     <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 20a6 6 0 0 1 .6-12A8 8 0 0 1 25 10a5 5 0 0 1-1 10z" fill="var(--accent)"/><path d="M11 24l-1.5 4M17 24l-1.5 4M23 24l-1.5 4" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/></svg>
-    <div><b>Rain Watch <span style="font:500 .65rem var(--mono);color:var(--muted)">v11.1</span></b><small id="stamp">Loading…</small></div>
-  </div>
-  <div class="seg" role="group" aria-label="Location">
-    <button type="button" data-loc="here" aria-pressed="true">Here</button>
-    <button type="button" data-loc="home" aria-pressed="false">Home</button>
+    <div><b>Rain Watch <span style="font:500 .65rem var(--mono);color:var(--muted)">v11.2</span></b><small id="stamp">Loading…</small></div>
   </div>
   <button id="refresh" type="button" class="btn">Refresh</button>
   <button id="menuBtn" type="button" class="menu" aria-label="Settings" aria-expanded="false"><span></span><span></span><span></span></button>
@@ -312,7 +308,7 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
     </div>
     <div class="mo mo-tr">
       <button id="radarBtn" type="button" class="btn" aria-pressed="false" title="Observed rain, past 2 hours">Radar</button>
-      <button id="mapLocate" type="button" class="btn" title="Center on my location">Me</button>
+      <button id="mapLocate" type="button" class="btn" title="Center on my location">Here</button>
       <button id="mapHome" type="button" class="btn" title="Center on home (drag the orange pin to move it)">Home</button>
       <button id="mapFs" type="button" class="btn" aria-pressed="false" title="Full screen">⤢</button>
     </div>
@@ -396,6 +392,10 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
 
 <nav class="dock" id="dock" aria-label="Forecast time">
   <div class="dock-in">
+    <div class="seg" role="group" aria-label="Location">
+      <button type="button" data-loc="here" aria-pressed="true">Here</button>
+      <button type="button" data-loc="home" aria-pressed="false">Home</button>
+    </div>
     <div class="seg" role="group" aria-label="Day">
       <button type="button" data-day="0" aria-pressed="true">Today</button>
       <button type="button" data-day="1" aria-pressed="false">Tomorrow</button>
