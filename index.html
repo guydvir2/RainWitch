@@ -362,7 +362,7 @@ input[type=range]{accent-color:var(--accent)}
         <div class="field">
           <label class="fl" for="radiusS">Radius of interest</label>
           <select id="radiusS" class="radiusSel"><option value="10">10 km</option><option value="20">20 km</option><option value="40">40 km</option></select>
-          <span class="fd">Used for area wet %, area totals and the rain grid on the map.</span>
+          <span class="fd">Used for the "around" stats on the Data page. The map shows the forecast for the whole visible area.</span>
         </div>
         <div class="field">
           <label class="fl" for="fromSel2">Total rain counts from</label>
@@ -596,8 +596,14 @@ function renderTimeline(){
   $('#mslotT').textContent = (sel.day ? 'Tmrw ' : '') + hhmm(c, x.t) + '–' + hhmm(c, x.t + STEP);
 }
 
+/* outlook window: today = from now; tomorrow = from the slider time */
+function outlookWindow(c, hours){
+  const now = Math.floor(Date.now() / 1000);
+  const t0 = sel.day === 0 ? now - (now % STEP) : dayStart(c, 1) + sel.slot * STEP;
+  return [t0, t0 + hours * 3600];
+}
 function outlook(r, hours){
-  const now = Math.floor(Date.now() / 1000), t0 = now - (now % STEP), t1 = t0 + hours * 3600, c = r.ds[0];
+  const c = r.ds[0], [t0, t1] = outlookWindow(c, hours);
   const P = {pmax:0, pmaxT:t0, total:0, start:null, heavy:0, heavyT:null};
   for (let t = t0; t < t1; t += STEP){
     const p = probAt(c, t) ?? 0, mm = mmAt(c, t) ?? 0;
@@ -606,7 +612,7 @@ function outlook(r, hours){
     if (P.start == null && mm >= WET_SLOT_MM) P.start = t;
     if (mm > P.heavy){ P.heavy = mm; P.heavyT = t; }
   }
-  P.rainingNow = c.current && c.current.precipitation > 0;
+  P.rainingNow = sel.day === 0 && c.current && c.current.precipitation > 0;
   const per = r.ds.map((d, i) => ({i, sum:sumMm(d, t0, t1), pmax:Math.max(0, ...Array.from({length:hours * 4}, (_, k) => probAt(d, t0 + k * STEP) ?? 0))}));
   const top = per.reduce((a, x) => x.sum > a.sum ? x : a, per[0]);
   const ptop = per.reduce((a, x) => x.pmax > a.pmax ? x : a, per[0]);
@@ -615,21 +621,24 @@ function outlook(r, hours){
   const A = {wetPct:Math.round(per.filter(x => x.sum >= WET_PERIOD_MM).length / per.length * 100),
     avg:per.reduce((a, x) => a + x.sum, 0) / per.length, max:top.sum, maxAt:r.pts[top.i],
     pmax:ptop.pmax, pmaxAt:r.pts[ptop.i], wetPeak, wetPeakT};
-  return {P, A, c};
+  return {P, A, c, t0, t1};
 }
 function renderStats(){
   const box = $('#stats'), nowRow = $('#nowRow'), note = $('#olNote');
   box.textContent = ''; nowRow.textContent = ''; note.textContent = '';
   const name = NAMES[sel.loc], place = sel.loc === 'home' ? 'home' : 'your location', h = cfg.hours + (cfg.hours === 1 ? ' hour' : ' hours');
-  $('#olTitle').textContent = 'Next ' + h + ' · ' + name;
+  $('#olTitle').textContent = (sel.day === 0 ? 'Next ' + h : h) + ' · ' + name;
   $('#scPoint').textContent = 'At ' + name;
   $('#scArea').textContent = cfg.radius + ' km around';
   $$('[data-scope]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.scope === cfg.scope)));
   const r = data[sel.loc];
   if (!r || r.error){ const p = document.createElement('p'); p.className = r ? 'err' : 'note'; p.textContent = r ? r.error : 'Loading forecast…'; box.append(p); return; }
-  const {P, A, c} = outlook(r, cfg.hours), tm = t => hhmm(c, t);
+  const {P, A, c, t0, t1} = outlook(r, cfg.hours), tm = t => hhmm(c, t);
+  const endDay = Math.floor((t1 - 1 - dayStart(c, sel.day)) / 86400);
+  const win = (sel.day === 0 ? 'Today ' : 'Tomorrow ') + tm(t0) + '–' + tm(t1) + (endDay > 0 ? ' (next day)' : '');
+  $('#olTitle').textContent += ' · ' + win;
   let items;
-  if (cfg.scope === 'point'){
+  if (cfg.scope === 'point' && sel.day === 0){
     const lab = document.createElement('span'); lab.textContent = 'Rain chance'; nowRow.append(lab);
     for (const x of nextHour(c)){
       const w = document.createElement('span'); w.className = 'nw';
@@ -637,22 +646,24 @@ function renderStats(){
       const ch = document.createElement('span'); ch.className = 'chip ' + x.level; ch.textContent = x.raining ? 'Rain' : x.p + '%';
       w.append(ch); nowRow.append(w);
     }
+  }
+  if (cfg.scope === 'point'){
     items = [
       {lvl:levelFor(P.pmax), k:'Highest rain chance', s:P.pmax ? 'at ' + tm(P.pmaxT) : 'whole period', v:P.pmax + '%'},
-      {lvl:mmLevel(P.total), k:'Rain expected', s:'total at ' + place + ', next ' + h, v:fmm(P.total)},
+      {lvl:mmLevel(P.total), k:'Rain expected', s:'total at ' + place + ' in this window', v:fmm(P.total)},
       {lvl:P.rainingNow ? 'bad' : P.start ? 'warn' : 'good', k:'Rain starts', s:P.rainingNow ? 'it is raining now' : P.start ? 'first wet 15 minutes' : 'no rain in this period', v:P.rainingNow ? 'now' : P.start ? tm(P.start) : '—'},
       {lvl:mmLevel(P.heavy * 4), k:'Heaviest 15 minutes', s:P.heavyT ? tm(P.heavyT) + '–' + tm(P.heavyT + STEP) : 'no rain in this period', v:fmm(P.heavy)}
     ];
-    note.textContent = 'Values at ' + place + ' only.';
+    note.textContent = 'Values at ' + place + ' only, ' + win + '.' + (sel.day ? ' Move the time slider to change the start.' : '');
   } else {
     items = [
-      {lvl:pctLevel(A.wetPct), k:'Area that gets wet', s:'gets ≥ ' + WET_PERIOD_MM + ' mm in the next ' + h, v:A.wetPct + '%'},
-      {lvl:mmLevel(A.avg), k:'Average rain', s:'total per spot, next ' + h, v:fmm(A.avg)},
+      {lvl:pctLevel(A.wetPct), k:'Area that gets wet', s:'gets ≥ ' + WET_PERIOD_MM + ' mm in this window', v:A.wetPct + '%'},
+      {lvl:mmLevel(A.avg), k:'Average rain', s:'total per spot in this window', v:fmm(A.avg)},
       {lvl:mmLevel(A.max), k:'Wettest spot', s:A.max >= 0.05 ? 'total, ' + dirOf(A.maxAt) : 'no rain expected', v:fmm(A.max)},
       {lvl:levelFor(A.pmax), k:'Highest rain chance', s:A.pmax ? dirOf(A.pmaxAt) : 'whole area', v:A.pmax + '%'},
       {lvl:pctLevel(A.wetPeak), k:'Most of area raining at once', s:A.wetPeak ? 'at ' + tm(A.wetPeakT) : 'no rain in this period', v:A.wetPeak + '%'}
     ];
-    note.textContent = 'Values across ' + cfg.radius + ' km around ' + place + ' (' + r.pts.length + ' forecast points).';
+    note.textContent = 'Values across ' + cfg.radius + ' km around ' + place + ', ' + win + ' (' + r.pts.length + ' forecast points).' + (sel.day ? ' Move the time slider to change the start.' : '');
   }
   items.sort((a, b) => RANK[b.lvl] - RANK[a.lvl]);
   for (const it of items){
@@ -695,7 +706,7 @@ function handleAlerts(){
   }
   save();
 }
-function renderSlot(){ renderTimeline(); drawGrid(); }
+function renderSlot(){ renderTimeline(); renderStats(); drawGrid(); }
 function renderAll(){ renderTimeline(); renderStats(); drawArea(); syncHomeBox(); }
 
 let busy = false, again = false;
@@ -711,6 +722,7 @@ async function refresh(){
   const r = data[sel.loc];
   if (!slotTouched && sel.day === 0 && r && r.ds) sel.slot = nowSlot(r.ds[0]);
   renderAll(); handleAlerts();
+  if (map && Date.now() - lastViewFetch > 25 * 60e3) loadView(true);
   $('#stamp').textContent = 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
   busy = false;
   if (again){ again = false; refresh(); }
@@ -802,7 +814,7 @@ const BASES = [
   {url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attribution:'Imagery © Esri'},
   {url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', subdomains:'abc', maxNativeZoom:17, attribution:'© OpenStreetMap contributors, © OpenTopoMap'}
 ];
-let map = null, baseLayer = null, meDot = null, meAcc = null, homePin = null, areaCircle = null;
+let map = null, baseLayer = null, meDot = null, meAcc = null, homePin = null;
 let frames = [], fi = 0, timer = null, mapOpacity = 0.7, buildToken = 0, placing = false, areaFitted = false, lastRefresh = 0;
 
 function addBase(i){
@@ -825,15 +837,17 @@ function initMap(){
   const hv = $('#hoverVal');
   const showVal = e => {
     const f = fieldValueAt(e.latlng);
-    if (!f || placing){ hv.hidden = true; return; }
-    hv.textContent = fvalOf(lastField.sc, f.v) + ' · ' + dirOf(f.p);
+    if (f == null || placing){ hv.hidden = true; return; }
+    const c = (data[sel.loc] && data[sel.loc].c) || centerOf(sel.loc);
+    hv.textContent = fvalOf(lastField.sc, f) + (c ? ' · ' + relTo(c, e.latlng.lat, e.latlng.lng) : '');
     hv.style.left = e.containerPoint.x + 'px'; hv.style.top = e.containerPoint.y + 'px'; hv.hidden = false;
   };
   map.on('mousemove', showVal);
   map.on('mouseout', () => { hv.hidden = true; });
   map.on('click', e => { if (placing){ setPlacing(false); setHome(e.latlng.lat, e.latlng.lng); } else showVal(e); });
+  map.on('moveend', scheduleView);
   drawHome(); drawMe(); drawArea(true);
-  syncLayerButtons(); buildFrames();
+  syncLayerButtons(); buildFrames(); loadView(true);
 }
 function drawHome(){
   if (!map) return;
@@ -842,7 +856,6 @@ function drawHome(){
   const icon = L.divIcon({className:'pin-wrap', html:'<div class="pin-home"></div>', iconSize:[22,22], iconAnchor:[11,26]});
   homePin = L.marker(ll, {icon, draggable:true, zIndexOffset:1000, title:'Home (drag to move)'}).addTo(map);
   homePin.bindTooltip('Home · drag to move', {direction:'top', offset:[0,-24]});
-  homePin.on('drag', () => { if (sel.loc === 'home' && areaCircle){ areaCircle.setLatLng(homePin.getLatLng()); clearField(); } });
   homePin.on('dragend', () => { const p = homePin.getLatLng(); setHome(p.lat, p.lng); });
 }
 function drawMe(){
@@ -856,23 +869,45 @@ function drawMe(){
     meAcc = L.circle(ll, {radius:hereAcc || 0, color:'#0a62c9', weight:1, fillColor:'#0a62c9', fillOpacity:0.12, interactive:false, pane:'area'}).addTo(map);
     meDot = L.circleMarker(ll, {radius:8, color:'#ffffff', weight:3, fillColor:'#0a62c9', fillOpacity:1, pane:'area'}).addTo(map).bindTooltip('You are here');
   }
-  if (sel.loc === 'here') drawArea();
+  if (sel.loc === 'here' && !areaFitted) drawArea();
 }
+/* ---------- map: forecast field over the visible map (no radius) ---------- */
+const VIEW_N = 6;            /* 6x6 forecast points across the view */
+let view = null, viewToken = 0, viewTimer = null, lastViewFetch = 0;
 function drawArea(fit){
   if (!map) return;
   const d = data[sel.loc], c = (d && d.c) || centerOf(sel.loc);
-  if (areaCircle){ map.removeLayer(areaCircle); areaCircle = null; }
-  if (c){
-    areaCircle = L.circle([c.lat, c.lon], {radius:cfg.radius * 1000, color:'#0a62c9', weight:2, dashArray:'6 6', fill:false, interactive:false, pane:'area'}).addTo(map);
-    if (fit || !areaFitted){
-      areaFitted = true;
-      const bottom = ($('.mo-b').offsetHeight || 120) + 40, topPad = ($('.mo-tl').offsetHeight || 90) + 30;
-      map.flyToBounds(areaCircle.getBounds(), {paddingTopLeft:[40, topPad], paddingBottomRight:[40, bottom], duration:0.6});
-    }
+  if (c && (fit || !areaFitted)){ areaFitted = true; map.setView([c.lat, c.lon], 10); }
+  drawGrid();
+}
+function viewCovers(){
+  if (!view) return false;
+  const b = map.getBounds();
+  return view.bounds.contains(b) && Math.abs(map.getZoom() - view.zoom) < 1.5;
+}
+async function loadView(force){
+  if (!map || $('#view-data').hidden) return;
+  if (!force && viewCovers()) return;
+  const token = ++viewToken;
+  const b = map.getBounds().pad(0.2), S = b.getSouth(), N = b.getNorth(), W = b.getWest(), E = b.getEast();
+  const pts = [];
+  for (let j = 0; j < VIEW_N; j++) for (let i = 0; i < VIEW_N; i++)
+    pts.push({lat:S + (N - S) * j / (VIEW_N - 1), lon:W + (E - W) * i / (VIEW_N - 1), i, j});
+  $('#gsum').textContent = 'Loading forecast for this view…';
+  try {
+    const ds = await getForecast(pts);
+    if (token !== viewToken) return;
+    view = {ds, pts, S, N, W, E, bounds:b, zoom:map.getZoom()};
+    lastViewFetch = Date.now();
+  } catch (e) {
+    if (token !== viewToken) return;
+    $('#gsum').textContent = e.message || 'Could not load the map forecast.'; return;
   }
   drawGrid();
 }
-/* ---------- smooth forecast field ---------- */
+function scheduleView(){ clearTimeout(viewTimer); viewTimer = setTimeout(() => loadView(false), 700); }
+
+/* ---------- smooth field rendering ---------- */
 const fieldCanvas = document.createElement('canvas');
 let fieldOverlay = null, lastField = null;
 const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
@@ -890,136 +925,135 @@ function rgbaFor(sc, v){
   }
   const [r, g, b] = hex2rgb(st[st.length - 1][1]); return [r, g, b, alpha];
 }
-function idw(P, s2, x, y){
+/* Gaussian blend in grid units (0..VIEW_N-1) */
+const S2 = 2 * 0.75 ** 2;
+function idw(P, x, y){
   let sw = 0, sv = 0;
-  /* Gaussian blend: s2 is 2*sigma^2; tiny floor keeps far pixels defined */
-  for (const q of P){ const dd = (x - q[0]) ** 2 + (y - q[1]) ** 2; const w = Math.exp(-dd / s2) + 1e-9; sw += w; sv += w * q[2]; }
+  for (const q of P){ const dd = (x - q[0]) ** 2 + (y - q[1]) ** 2; const w = Math.exp(-dd / S2) + 1e-9; sw += w; sv += w * q[2]; }
   return sv / sw;
 }
-function renderField(r, vals, sc){
-  const N = 180, R = cfg.radius, pts = r.pts, s2 = 2 * (pts.step * 0.75) ** 2;
-  const P = pts.map((p, i) => [p.dx, p.dy, vals[i]]).filter(q => q[2] != null);
-  fieldCanvas.width = N; fieldCanvas.height = N;
-  const ctx = fieldCanvas.getContext('2d'), img = ctx.createImageData(N, N), D = img.data;
-  for (let py = 0; py < N; py++){
-    const y = R - (py + 0.5) / N * 2 * R;
-    for (let px = 0; px < N; px++){
-      const x = -R + (px + 0.5) / N * 2 * R, d = Math.hypot(x, y);
-      if (d > R) continue;
-      const c = rgbaFor(sc, idw(P, s2, x, y));
-      if (!c) continue;
-      const edge = Math.min(1, (R - d) / (R * 0.06)), k = (py * N + px) * 4;
-      D[k] = c[0]; D[k + 1] = c[1]; D[k + 2] = c[2]; D[k + 3] = Math.round(c[3] * edge * 255);
+const toGrid = (lat, lon) => [(lon - view.W) / (view.E - view.W) * (VIEW_N - 1), (lat - view.S) / (view.N - view.S) * (VIEW_N - 1)];
+const toLL = (gx, gy) => [view.S + gy / (VIEW_N - 1) * (view.N - view.S), view.W + gx / (VIEW_N - 1) * (view.E - view.W)];
+function renderField(vals, sc){
+  const P = view.pts.map((p, k) => [p.i, p.j, vals[k]]).filter(q => q[2] != null);
+  if (!P.length){ clearField(); return; }
+  const Wd = 200, Ht = 200;
+  fieldCanvas.width = Wd; fieldCanvas.height = Ht;
+  const ctx = fieldCanvas.getContext('2d'), img = ctx.createImageData(Wd, Ht), D = img.data;
+  for (let py = 0; py < Ht; py++){
+    const gy = (1 - (py + 0.5) / Ht) * (VIEW_N - 1);
+    for (let px = 0; px < Wd; px++){
+      const gx = (px + 0.5) / Wd * (VIEW_N - 1);
+      const c = rgbaFor(sc, idw(P, gx, gy)); if (!c) continue;
+      const k = (py * Wd + px) * 4;
+      D[k] = c[0]; D[k + 1] = c[1]; D[k + 2] = c[2]; D[k + 3] = Math.round(c[3] * 255);
     }
   }
   ctx.putImageData(img, 0, 0);
-  const c0 = r.c, bounds = [[c0.lat - R * pts.kLat, c0.lon - R * pts.kLon], [c0.lat + R * pts.kLat, c0.lon + R * pts.kLon]];
-  const url = fieldCanvas.toDataURL();
+  const bounds = [[view.S, view.W], [view.N, view.E]], url = fieldCanvas.toDataURL();
   if (fieldOverlay){ fieldOverlay.setUrl(url); fieldOverlay.setBounds(L.latLngBounds(bounds)); }
   else fieldOverlay = L.imageOverlay(url, bounds, {pane:'grid', interactive:false}).addTo(map);
-  lastField = {r, P, s2, sc, R};
-  drawContours(r, P, s2, sc);
+  lastField = {P, sc};
+  drawContours(P, sc);
 }
+let centerLabel = null, contourLayer = null;
 function clearField(){ if (fieldOverlay){ map.removeLayer(fieldOverlay); fieldOverlay = null; } lastField = null; if (contourLayer) contourLayer.clearLayers(); if (centerLabel){ map.removeLayer(centerLabel); centerLabel = null; } }
-let centerLabel = null;
-function drawCenterLabel(r, txt){
+function drawCenterLabel(c, txt){
   const html = '<span>' + txt.replace(/[<>&]/g, '') + '</span>';
   const icon = L.divIcon({className:'cval', html, iconSize:[0, 0]});
-  if (centerLabel){ centerLabel.setLatLng([r.c.lat, r.c.lon]); centerLabel.setIcon(icon); }
-  else centerLabel = L.marker([r.c.lat, r.c.lon], {icon, pane:'area', interactive:false, keyboard:false, zIndexOffset:2000}).addTo(map);
+  if (centerLabel){ centerLabel.setLatLng([c.lat, c.lon]); centerLabel.setIcon(icon); }
+  else centerLabel = L.marker([c.lat, c.lon], {icon, pane:'area', interactive:false, keyboard:false, zIndexOffset:2000}).addTo(map);
 }
-
-/* contour lines (marching squares) with value labels */
-let contourLayer = null;
 const MS = {1:[[3,0]],2:[[0,1]],3:[[3,1]],4:[[1,2]],5:[[3,2],[0,1]],6:[[0,2]],7:[[3,2]],8:[[2,3]],9:[[0,2]],10:[[0,3],[1,2]],11:[[1,2]],12:[[1,3]],13:[[0,1]],14:[[0,3]]};
-function drawContours(r, P, s2, sc){
+function drawContours(P, sc){
   if (!contourLayer) contourLayer = L.layerGroup().addTo(map);
   contourLayer.clearLayers();
-  const R = cfg.radius, pts = r.pts, c0 = r.c, M = 56, h = 2 * R / M;
-  const V = [];
+  const M = 60, G = VIEW_N - 1, h = G / M, V = [];
   let vmin = Infinity, vmax = -Infinity;
-  for (let j = 0; j <= M; j++){ const row = []; for (let i = 0; i <= M; i++){
-    const x = -R + i * h, y = -R + j * h;
-    if (Math.hypot(x, y) > R * 0.985){ row.push(NaN); continue; }
-    const v = idw(P, s2, x, y); row.push(v); if (v < vmin) vmin = v; if (v > vmax) vmax = v;
-  } V.push(row); }
-  const toLL = (x, y) => [c0.lat + y * pts.kLat, c0.lon + x * pts.kLon];
+  for (let j = 0; j <= M; j++){ const row = []; for (let i = 0; i <= M; i++){ const v = idw(P, i * h, j * h); row.push(v); if (v < vmin) vmin = v; if (v > vmax) vmax = v; } V.push(row); }
+  /* labels go inside the visible map, away from its edges */
+  const vb = map.getBounds().pad(-0.12);
   const labels = [];
   for (const [L0] of SCALES[sc].steps){
     if (L0 <= vmin || L0 >= vmax) continue;
     const segs = [];
     for (let j = 0; j < M; j++) for (let i = 0; i < M; i++){
       const a = V[j][i], b = V[j][i + 1], cc = V[j + 1][i + 1], d = V[j + 1][i];
-      if (isNaN(a) || isNaN(b) || isNaN(cc) || isNaN(d)) continue;
       const k = (a >= L0) | (b >= L0) << 1 | (cc >= L0) << 2 | (d >= L0) << 3;
       const cases = MS[k]; if (!cases) continue;
-      const x0 = -R + i * h, y0 = -R + j * h, t = (p, q) => (L0 - p) / (q - p);
-      const E = [
-        () => [x0 + h * t(a, b), y0],
-        () => [x0 + h, y0 + h * t(b, cc)],
-        () => [x0 + h * t(d, cc), y0 + h],
-        () => [x0, y0 + h * t(a, d)]
-      ];
+      const x0 = i * h, y0 = j * h, t = (p, q) => (L0 - p) / (q - p);
+      const E = [() => [x0 + h * t(a, b), y0], () => [x0 + h, y0 + h * t(b, cc)], () => [x0 + h * t(d, cc), y0 + h], () => [x0, y0 + h * t(a, d)]];
       for (const [e1, e2] of cases) segs.push([E[e1](), E[e2]()]);
     }
     if (!segs.length) continue;
     L.polyline(segs.map(sg => [toLL(...sg[0]), toLL(...sg[1])]), {pane:'grid', color:'#0f1b2a', weight:1.3, opacity:0.55, interactive:false}).addTo(contourLayer);
-    /* up to two labels per level, spread apart */
-    const mids = segs.map(sg => [(sg[0][0] + sg[1][0]) / 2, (sg[0][1] + sg[1][1]) / 2]);
-    let cand = mids.filter(q => Math.hypot(q[0], q[1]) < R * 0.78); if (!cand.length) cand = mids;
-    const first = cand.reduce((m, q) => Math.abs(Math.hypot(q[0], q[1]) - R * 0.5) < Math.abs(Math.hypot(m[0], m[1]) - R * 0.5) ? q : m);
-    const second = cand.reduce((m, q) => Math.hypot(q[0] - first[0], q[1] - first[1]) > Math.hypot(m[0] - first[0], m[1] - first[1]) ? q : m);
-    const order = [first, second];
-    for (const q of order){
-      if (labels.some(l => Math.hypot(l[0] - q[0], l[1] - q[1]) < R * 0.3)) continue;
-      labels.push(q);
+    const mids = segs.map(sg => toLL((sg[0][0] + sg[1][0]) / 2, (sg[0][1] + sg[1][1]) / 2)).filter(ll => vb.contains(ll));
+    if (!mids.length) continue;
+    const pick = [mids[Math.floor(mids.length * 0.3)], mids[Math.floor(mids.length * 0.75)]];
+    for (const ll of pick){
+      const pt = map.latLngToContainerPoint(ll);
+      if (labels.some(q => Math.hypot(q.x - pt.x, q.y - pt.y) < 90)) continue;
+      labels.push(pt);
       const txt = sc === 'cloud' ? L0 + '%' : L0 + ' ' + SCALES[sc].unit;
-      L.marker(toLL(q[0], q[1]), {pane:'area', interactive:false, keyboard:false,
-        icon:L.divIcon({className:'clab', html:'<span>' + txt + '</span>', iconSize:[0, 0]})}).addTo(contourLayer);
+      L.marker(ll, {pane:'area', interactive:false, keyboard:false, icon:L.divIcon({className:'clab', html:'<span>' + txt + '</span>', iconSize:[0, 0]})}).addTo(contourLayer);
     }
   }
 }
 function fieldValueAt(ll){
-  if (!lastField) return null;
-  const {r, P, s2, R} = lastField, pts = r.pts;
-  const y = (ll.lat - r.c.lat) / pts.kLat, x = (ll.lng - r.c.lon) / pts.kLon;
-  if (Math.hypot(x, y) > R) return null;
-  return {v:idw(P, s2, x, y), p:{dx:x, dy:y}};
+  if (!lastField || !view) return null;
+  const [gx, gy] = toGrid(ll.lat, ll.lng);
+  if (gx < 0 || gy < 0 || gx > VIEW_N - 1 || gy > VIEW_N - 1) return null;
+  return idw(lastField.P, gx, gy);
 }
 const fvalOf = (sc, v) => sc === 'cloud' ? Math.round(v) + '%' : fmm(v, SCALES[sc].unit);
-
+function viewValues(){
+  const c = view.ds[0], ds0 = dayStart(c, sel.day), t = ds0 + sel.slot * STEP, tEnd = t + STEP;
+  if (cfg.grid === 'rate') return {t, vals:view.ds.map(d => { const v = mmAt(d, t); return v == null ? null : v * 4; })};
+  if (cfg.grid === 'cloud') return {t, vals:view.ds.map(d => cloudAt(d, t + STEP / 2))};
+  const from = ds0 + cfg.fromHour * 3600;
+  if (from >= tEnd) return {t, from, vals:null};
+  return {t, from, vals:view.ds.map(d => sumMm(d, from, tEnd))};
+}
+function relTo(c, lat, lon){
+  const kLat = 1 / 111.32, kLon = 1 / (111.32 * Math.cos(c.lat * Math.PI / 180));
+  return dirOf({dx:(lon - c.lon) / kLon, dy:(lat - c.lat) / kLat});
+}
 function drawGrid(){
   if (!map) return;
   $('#fromWrap').hidden = cfg.grid !== 'total';
   renderScale();
-  const r = data[sel.loc], sum = $('#gsum');
-  if (!r || r.error){ clearField(); sum.textContent = r ? r.error : 'Loading forecast…'; return; }
-  const g = gridValues(r), c = r.ds[0], pts = r.pts, sc = cfg.grid;
-  const tEnd = g.t + STEP, when = (sel.day ? 'tomorrow ' : '') + hhmm(c, g.t) + '–' + hhmm(c, tEnd);
+  const sum = $('#gsum');
+  if (!view){ clearField(); sum.textContent = 'Loading forecast for this view…'; loadView(true); return; }
+  const g = viewValues(), sc = cfg.grid, fval = v => fvalOf(sc, v);
   if (!g.vals){ clearField(); sum.textContent = 'Move the slider past ' + hLabel(cfg.fromHour) + ' to see the total.'; return; }
-  renderField(r, g.vals, sc);
-  const fval = v => fvalOf(sc, v);
-  const cv = g.vals[0] ?? 0;
-  drawCenterLabel(r, NAMES[sel.loc] + ' · ' + (sc === 'rate' ? fval(cv) : sc === 'total' ? fval(cv) + ' since ' + hLabel(cfg.fromHour) : 'cloud ' + fval(cv)));
-  const valid = g.vals.map((v, i) => ({v, i})).filter(x => x.v != null);
-  if (!valid.length){ sum.textContent = 'No forecast for this time.'; return; }
-  const avg = valid.reduce((a, x) => a + x.v, 0) / valid.length;
-  const top = valid.reduce((a, x) => x.v > a.v ? x : a, valid[0]);
+  renderField(g.vals, sc);
+  /* value at the selected place, read from its own forecast */
+  const r = data[sel.loc], c = (r && r.c) || centerOf(sel.loc);
+  let cv = null;
+  if (r && r.ds){
+    const d = r.ds[0];
+    cv = sc === 'rate' ? (mmAt(d, g.t) ?? 0) * 4 : sc === 'cloud' ? cloudAt(d, g.t + STEP / 2) : (g.from < g.t + STEP ? sumMm(d, g.from, g.t + STEP) : null);
+  }
+  if (c && cv != null) drawCenterLabel(c, NAMES[sel.loc] + ' · ' + (sc === 'total' ? fval(cv) + ' since ' + hLabel(cfg.fromHour) : sc === 'cloud' ? 'cloud ' + fval(cv) : fval(cv)));
+  /* summary for what is on screen */
+  const vb = map.getBounds();
+  const inView = g.vals.map((v, k) => ({v, p:view.pts[k]})).filter(x => x.v != null && vb.contains([x.p.lat, x.p.lon]));
+  const list = inView.length ? inView : g.vals.map((v, k) => ({v, p:view.pts[k]})).filter(x => x.v != null);
   sum.textContent = '';
   const add = (k, v) => { const s = document.createElement('span'); s.textContent = k + ' '; const b = document.createElement('b'); b.textContent = v; s.append(b); sum.append(s); };
+  if (!list.length){ sum.textContent = 'No forecast for this time.'; return; }
+  const avg = list.reduce((a, x) => a + x.v, 0) / list.length;
+  const top = list.reduce((a, x) => x.v > a.v ? x : a, list[0]);
+  if (cv != null) add(NAMES[sel.loc], fval(cv));
+  add('Map avg', fval(avg));
   if (sc === 'cloud'){
-    const low = valid.reduce((a, x) => x.v < a.v ? x : a, valid[0]);
-    add(NAMES[sel.loc], fval(g.vals[0] ?? 0));
-    add('Area avg', fval(avg));
-    add('Clearest', fval(low.v) + ' · ' + dirOf(pts[low.i]));
+    const low = list.reduce((a, x) => x.v < a.v ? x : a, list[0]);
+    add('Clearest', fval(low.v) + (c ? ' · ' + relTo(c, low.p.lat, low.p.lon) : ''));
     return;
   }
+  add('Max', fval(top.v) + (top.v >= 0.05 && c ? ' · ' + relTo(c, top.p.lat, top.p.lon) : ''));
   const wetCut = sc === 'rate' ? WET_SLOT_MM * 4 : WET_PERIOD_MM;
-  const wet = Math.round(valid.filter(x => x.v >= wetCut).length / valid.length * 100);
-  add(NAMES[sel.loc], fval(g.vals[0] ?? 0));
-  add('Area avg', fval(avg));
-  add('Max', fval(top.v) + (top.v >= 0.05 ? ' · ' + dirOf(pts[top.i]) : ''));
-  add('Wet', wet + '% of ' + cfg.radius + ' km');
+  add('Wet', Math.round(list.filter(x => x.v >= wetCut).length / list.length * 100) + '% of map');
 }
 function renderScale(){
   const box = $('#scale'); box.textContent = '';
