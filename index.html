@@ -108,7 +108,22 @@ input[type=range]{accent-color:var(--accent)}
 .hours{position:relative;height:16px;font-family:var(--mono);font-size:.72rem;color:var(--muted)}
 .hours span{position:absolute;transform:translateX(-50%)}
 .hours span:first-child{transform:none} .hours span:last-child{transform:translateX(-100%)}
-#slot{width:100%;margin:0}
+/* bottom time dock */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:3500;background:color-mix(in srgb,var(--panel) 96%,transparent);border-top:1px solid var(--line);backdrop-filter:blur(8px);box-shadow:0 -2px 10px rgb(0 0 0 / .08);
+  padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.dock-in{max-width:1400px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.dslide{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.dslide input{width:100%;margin:0;height:24px}
+.dticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.66rem;color:var(--muted)}
+.dock .t{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:8.5em;text-align:right}
+body{padding-bottom:calc(var(--dock, 70px) + 20px)}
+.menu{width:42px;height:38px;border:1px solid var(--line);background:var(--panel);border-radius:9px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;padding:0}
+.menu span{display:block;width:18px;height:2px;border-radius:2px;background:var(--ink)}
+.menu[aria-expanded="true"]{background:var(--accent);border-color:var(--accent)} .menu[aria-expanded="true"] span{background:var(--accent-ink)}
+.sethead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.sethead h1{margin:0;font-size:1.2rem}
+.wet-pin i{position:absolute;width:16px;height:16px;left:-8px;top:-8px;border-radius:50%;background:var(--bad);border:3px solid #fff;box-shadow:0 1px 4px rgb(0 0 0 / .4)}
+.wet-pin span{position:absolute;left:12px;top:-11px;white-space:nowrap;font-family:var(--mono);font-size:11px;font-weight:600;color:#0f1b2a;background:#fff;border:1.5px solid var(--bad);border-radius:5px;padding:1px 6px;line-height:16px}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.75rem;color:var(--muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 .legend i.line{height:3px;width:14px;vertical-align:2px}
@@ -187,7 +202,7 @@ input[type=range]{accent-color:var(--accent)}
 .mo-b .radar .play{width:30px;height:30px;font-size:.8rem}
 .mo-b input[type=range]{height:22px}
 .clab span{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;font-family:var(--mono);font-size:11px;font-weight:600;color:#0f1b2a;background:rgb(255 255 255 / .85);border-radius:4px;padding:0 4px;line-height:16px;box-shadow:0 0 0 1px rgb(15 27 42 / .15)}
-.mapwrap.fs{position:fixed;inset:0;z-index:3000;height:auto;min-height:0;margin:0;border-radius:0;border:0}
+.mapwrap.fs{position:fixed;inset:0 0 var(--dock, 70px) 0;z-index:3000;height:auto;min-height:0;margin:0;border-radius:0;border:0}
 .hover{position:absolute;z-index:1000;pointer-events:none;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-family:var(--mono);font-size:.8rem;font-weight:600;box-shadow:0 2px 6px rgb(0 0 0 / .18);transform:translate(12px,-120%);white-space:nowrap}
 .hint{position:absolute;z-index:1000;left:50%;top:110px;transform:translateX(-50%);background:var(--accent);color:var(--accent-ink);padding:7px 14px;border-radius:999px;font-weight:600;font-size:.85rem;box-shadow:0 2px 6px rgb(0 0 0 / .2);white-space:nowrap}
 .leaflet-top.leaflet-right{top:56px}
@@ -202,6 +217,11 @@ input[type=range]{accent-color:var(--accent)}
   .mo-b label.op{display:none}
 }
 @media (max-width:600px){
+  .dock-in{flex-wrap:wrap;gap:8px 10px}
+  .dslide{order:5;flex-basis:100%}
+  .dock .t{margin-left:auto;min-width:0;font-size:.9rem}
+  .dock .pfx{display:none}
+  .dock .seg button{padding:6px 10px}
   .hours span.minor{display:none}
   .mo-tr{top:60px;left:12px;right:12px;justify-content:flex-start}
   .leaflet-top.leaflet-right{top:108px}
@@ -222,25 +242,18 @@ input[type=range]{accent-color:var(--accent)}
     <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 20a6 6 0 0 1 .6-12A8 8 0 0 1 25 10a5 5 0 0 1-1 10z" fill="var(--accent)"/><path d="M11 24l-1.5 4M17 24l-1.5 4M23 24l-1.5 4" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/></svg>
     <div><b>Rain Watch</b><small id="stamp">Loading…</small></div>
   </div>
-  <div class="tabs" role="tablist" aria-label="View">
-    <button type="button" role="tab" id="tab-data" data-tab="data" aria-selected="true" aria-controls="view-data">Data</button>
-    <button type="button" role="tab" id="tab-settings" data-tab="settings" aria-selected="false" aria-controls="view-settings">Settings</button>
-  </div>
   <div class="seg" role="group" aria-label="Location">
     <button type="button" data-loc="here" aria-pressed="true">Here</button>
     <button type="button" data-loc="home" aria-pressed="false">Home</button>
   </div>
-  <div class="seg" role="group" aria-label="Day">
-    <button type="button" data-day="0" aria-pressed="true">Today</button>
-    <button type="button" data-day="1" aria-pressed="false">Tomorrow</button>
-  </div>
   <button id="refresh" type="button" class="btn">Refresh</button>
+  <button id="menuBtn" type="button" class="menu" aria-label="Settings" aria-expanded="false"><span></span><span></span><span></span></button>
 </header>
 
 <div id="alerts" aria-live="polite"></div>
 
 <!-- DATA TAB -->
-<section id="view-data" role="tabpanel" aria-labelledby="tab-data">
+<section id="view-data">
   <section class="panel" aria-label="Outlook and rain chance">
     <div class="ph">
       <h2 id="olTitle">Next 3 hours · Here</h2>
@@ -268,7 +281,6 @@ input[type=range]{accent-color:var(--accent)}
           <span class="thrlab" id="thrLab"></span>
         </div>
         <div class="hours" id="hours"></div>
-        <input id="slot" type="range" min="0" max="95" step="1" value="0" aria-label="Time of day, 15-minute steps">
         <div class="legend">
           <span><i style="background:var(--good)"></i>Dry</span>
           <span><i style="background:var(--warn)"></i>Possible</span>
@@ -308,11 +320,6 @@ input[type=range]{accent-color:var(--accent)}
     <div class="hover" id="hoverVal" hidden></div>
     <div class="mo mo-b">
       <div class="row">
-        <button id="fPlay" type="button" class="play" aria-label="Play forecast">▶</button>
-        <input id="mslot" type="range" min="0" max="95" step="1" value="0" aria-label="Forecast time, 15-minute steps">
-        <span class="t" id="mslotT">--:--</span>
-      </div>
-      <div class="row">
         <div class="scale" id="scale"></div>
         <label for="fromSel" id="fromWrap" class="from">since <select id="fromSel"></select></label>
       </div>
@@ -328,7 +335,8 @@ input[type=range]{accent-color:var(--accent)}
 </section>
 
 <!-- SETTINGS TAB -->
-<section id="view-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+<section id="view-settings" hidden>
+  <div class="sethead"><h1>Settings</h1><button id="setClose" type="button" class="btn">Done</button></div>
   <div class="sgrid">
     <section class="panel">
       <div class="ph"><h2>Alerts</h2></div>
@@ -351,7 +359,7 @@ input[type=range]{accent-color:var(--accent)}
           <button id="placeHome2" type="button" class="btn">Place home on map</button>
           <button id="hereAsHome" type="button" class="btn">Set home to here</button>
         </div>
-        <p class="note">You can also drag the orange pin on the Map tab.</p>
+        <p class="note">You can also drag the orange pin on the map.</p>
         <div class="you" id="youInfo">Locating…</div>
       </div>
     </section>
@@ -385,6 +393,21 @@ input[type=range]{accent-color:var(--accent)}
   </div>
 </section>
 </div>
+
+<nav class="dock" id="dock" aria-label="Forecast time">
+  <div class="dock-in">
+    <div class="seg" role="group" aria-label="Day">
+      <button type="button" data-day="0" aria-pressed="true">Today</button>
+      <button type="button" data-day="1" aria-pressed="false">Tomorrow</button>
+    </div>
+    <button id="fPlay" type="button" class="play" aria-label="Play forecast">▶</button>
+    <div class="dslide">
+      <input id="mslot" type="range" min="0" max="95" step="1" value="0" aria-label="Forecast time, 15-minute steps">
+      <div class="dticks"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+    </div>
+    <span class="t" id="mslotT">--:--</span>
+  </div>
+</nav>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -558,7 +581,7 @@ function renderTimeline(){
   $('#tlTitle').textContent = 'Rain chance · ' + NAMES[sel.loc] + ' · ' + (sel.day ? 'Tomorrow' : 'Today');
   $('#roAccL').textContent = 'Total since ' + hLabel(cfg.fromHour);
   const svg = $('#chartSvg'), err = $('#chartErr');
-  $('#slot').value = sel.slot; $('#mslot').value = sel.slot;
+  $('#mslot').value = sel.slot;
   const blank = () => { $('#roPct').className = 'ro-pct'; $('#roPct').innerHTML = '--<small>%</small>';
     $('#roTime').textContent = '--:--'; ['#roMm','#roAcc','#roCloud'].forEach(s => $(s).textContent = '--'); };
   if (!r || r.error){ svg.innerHTML = ''; err.textContent = r ? r.error : ''; blank(); return; }
@@ -593,7 +616,7 @@ function renderTimeline(){
   $('#roAcc').textContent = from >= x.t + STEP ? 'after this slot' : fmm(sumMm(c, from, x.t + STEP));
   const cc = cloudAt(c, x.t + STEP / 2);
   $('#roCloud').textContent = cc == null ? '--' : cc + '%';
-  $('#mslotT').textContent = (sel.day ? 'Tmrw ' : '') + hhmm(c, x.t) + '–' + hhmm(c, x.t + STEP);
+  $('#mslotT').innerHTML = '<span class="pfx">' + (sel.day ? 'Tomorrow ' : 'Today ') + '</span>' + hhmm(c, x.t) + '–' + hhmm(c, x.t + STEP);
 }
 
 /* outlook window: today = from now; tomorrow = from the slider time */
@@ -730,7 +753,6 @@ async function refresh(){
 
 /* ---------- controls ---------- */
 function pickSlot(i){ stopFPlay(); sel.slot = Math.max(0, Math.min(SLOTS - 1, i)); slotTouched = true; renderSlot(); }
-$('#slot').addEventListener('input', e => pickSlot(+e.target.value));
 $('#mslot').addEventListener('input', e => pickSlot(+e.target.value));
 const chart = $('#chart');
 function chartPick(e){ const b = chart.getBoundingClientRect(); pickSlot(Math.floor((e.clientX - b.left) / b.width * SLOTS)); }
@@ -751,12 +773,15 @@ $$('[data-loc]').forEach(b => b.addEventListener('click', () => {
 }));
 function setTab(t){
   cfg.tab = t; save();
-  $$('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+  $('#menuBtn').setAttribute('aria-expanded', String(t === 'settings'));
   $('#view-data').hidden = t !== 'data';
   $('#view-settings').hidden = t !== 'settings';
   if (t === 'data'){ if (!map) initMap(); else { map.invalidateSize(); } }
 }
-$$('[data-tab]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+$('#menuBtn').addEventListener('click', () => setTab(cfg.tab === 'settings' ? 'data' : 'settings'));
+$('#setClose').addEventListener('click', () => setTab('data'));
+function sizeDock(){ document.documentElement.style.setProperty('--dock', $('#dock').offsetHeight + 'px'); }
+window.addEventListener('resize', sizeDock); sizeDock();
 
 function fillFrom(){
   for (const id of ['#fromSel', '#fromSel2']){
@@ -967,8 +992,8 @@ function renderField(vals, sc){
   lastField = {P, sc};
   drawContours(P, sc);
 }
-let centerLabel = null, contourLayer = null;
-function clearField(){ if (fieldOverlay){ map.removeLayer(fieldOverlay); fieldOverlay = null; } lastField = null; if (contourLayer) contourLayer.clearLayers(); if (centerLabel){ map.removeLayer(centerLabel); centerLabel = null; } }
+let centerLabel = null, contourLayer = null, wetPin = null;
+function clearField(){ if (fieldOverlay){ map.removeLayer(fieldOverlay); fieldOverlay = null; } lastField = null; if (contourLayer) contourLayer.clearLayers(); if (centerLabel){ map.removeLayer(centerLabel); centerLabel = null; } if (wetPin){ map.removeLayer(wetPin); wetPin = null; } }
 function drawCenterLabel(c, txt){
   const html = '<span>' + txt.replace(/[<>&]/g, '') + '</span>';
   const icon = L.divIcon({className:'cval', html, iconSize:[0, 0]});
@@ -1017,6 +1042,25 @@ function fieldValueAt(ll){
   return idw(lastField.P, gx, gy);
 }
 const fvalOf = (sc, v) => sc === 'cloud' ? Math.round(v) + '%' : fmm(v, SCALES[sc].unit);
+/* wettest point inside the circle, read from the smooth field */
+function drawWettest(sc, c){
+  if (wetPin){ map.removeLayer(wetPin); wetPin = null; }
+  if (!lastField || !c || sc === 'cloud') return null;
+  const R = cfg.radius, kLat = 1 / 111.32, kLon = 1 / (111.32 * Math.cos(c.lat * Math.PI / 180)), st = R / 20;
+  let best = null;
+  for (let y = -R; y <= R; y += st) for (let x = -R; x <= R; x += st){
+    if (Math.hypot(x, y) > R) continue;
+    const lat = c.lat + y * kLat, lon = c.lon + x * kLon, [gx, gy] = toGrid(lat, lon);
+    if (gx < 0 || gy < 0 || gx > VIEW_N - 1 || gy > VIEW_N - 1) continue;
+    const v = idw(lastField.P, gx, gy);
+    if (!best || v > best.v) best = {v, lat, lon, x, y};
+  }
+  if (!best || best.v < (sc === 'rate' ? WET_SLOT_MM * 4 : WET_PERIOD_MM)) return null;
+  const txt = 'Wettest · ' + fvalOf(sc, best.v) + ' · ' + dirOf({dx:best.x, dy:best.y});
+  wetPin = L.marker([best.lat, best.lon], {pane:'area', interactive:false, keyboard:false, zIndexOffset:1500,
+    icon:L.divIcon({className:'wet-pin', html:'<i></i><span>' + txt + '</span>', iconSize:[0, 0]})}).addTo(map);
+  return best;
+}
 function viewValues(){
   const c = view.ds[0], ds0 = dayStart(c, sel.day), t = ds0 + sel.slot * STEP, tEnd = t + STEP;
   if (cfg.grid === 'rate') return {t, vals:view.ds.map(d => { const v = mmAt(d, t); return v == null ? null : v * 4; })};
@@ -1045,6 +1089,7 @@ function drawGrid(){
     const d = r.ds[0];
     cv = sc === 'rate' ? (mmAt(d, g.t) ?? 0) * 4 : sc === 'cloud' ? cloudAt(d, g.t + STEP / 2) : (g.from < g.t + STEP ? sumMm(d, g.from, g.t + STEP) : null);
   }
+  const wet = drawWettest(sc, c);
   if (c && cv != null) drawCenterLabel(c, NAMES[sel.loc] + ' · ' + (sc === 'total' ? fval(cv) + ' since ' + hLabel(cfg.fromHour) : sc === 'cloud' ? 'cloud ' + fval(cv) : fval(cv)));
   /* summary for what is on screen */
   const vb = map.getBounds();
@@ -1062,7 +1107,8 @@ function drawGrid(){
     add('Clearest', fval(low.v) + (c ? ' · ' + relTo(c, low.p.lat, low.p.lon) : ''));
     return;
   }
-  add('Max', fval(top.v) + (top.v >= 0.05 && c ? ' · ' + relTo(c, top.p.lat, top.p.lon) : ''));
+  if (wet) add('Wettest in circle', fval(wet.v) + ' · ' + dirOf({dx:wet.x, dy:wet.y}));
+  add('Map max', fval(top.v) + (top.v >= 0.05 && c ? ' · ' + relTo(c, top.p.lat, top.p.lon) : ''));
   const wetCut = sc === 'rate' ? WET_SLOT_MM * 4 : WET_PERIOD_MM;
   add('Wet', Math.round(list.filter(x => x.v >= wetCut).length / list.length * 100) + '% of map');
 }
