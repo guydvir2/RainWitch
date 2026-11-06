@@ -256,7 +256,7 @@ body:not(.geek) .mapwrap{height:calc(100dvh - var(--dock,70px) - 84px);min-heigh
 <header class="top">
   <div class="brand">
     <svg viewBox="-4 -6 68 52" aria-hidden="true"><g stroke-linecap="round" stroke-linejoin="round"><path d="M12 35 L58 22" stroke="#6b4a1e" stroke-width="3" fill="none"/><path d="M13 31.5 C6 26 -1 29 -3 38 C3 41 9 40 15 37 Z" fill="#d0a03a"/><path d="M12 33 L-1 35 M12 35 L-2 38 M13 36.5 L1 40" stroke="#8a6416" stroke-width=".9" fill="none"/><path d="M12.5 31.5 L15.5 37.5" stroke="#3a2a14" stroke-width="2.6" fill="none"/><path d="M30 30 C21 28 14 33 8 29 C14 38 25 38 33 34 Z" fill="#7a5cc4" stroke="none"/><path d="M31 36 L33 43 L38 44" stroke="#2a1d4a" stroke-width="3.4" fill="none"/><path d="M28 32 C27 22 33 17 39 18 C44 19 45 26 44 31 Z" fill="#4b2f86"/><path d="M41 24 L49 26" stroke="#4b2f86" stroke-width="3" fill="none"/><circle cx="50" cy="26.4" r="1.7" fill="#f1c9a5" stroke="none"/><path d="M36 11 C30 10 26 14 22 20 C28 18 32 18 37 17 Z" fill="#b5541c" stroke="none"/><circle cx="41" cy="13.2" r="5.2" fill="#f4cfae" stroke="none"/><circle cx="43.2" cy="12.6" r=".9" fill="#241b3d" stroke="none"/><path d="M45.5 14 L48 16.4 L45.2 16.2" fill="#f4cfae" stroke="#e3b896" stroke-width=".5"/><ellipse cx="41" cy="8.6" rx="10" ry="2.3" fill="#241b3d" stroke="none"/><path d="M33.2 8.4 C34.5 2 39 -1.5 47 -5 C44 -2 44.5 3 48.6 8.4 Z" fill="#241b3d" stroke="none"/><path d="M33.6 6.6 C37 7.8 44 7.8 48 6.4" stroke="#d0a03a" stroke-width="1.6" fill="none"/></g></svg>
-    <div><b>Rain Witch <span style="font:500 .65rem var(--mono);color:var(--muted)">v0.6</span></b><small id="stamp">Loading…</small></div>
+    <div><b>Rain Witch <span style="font:500 .65rem var(--mono);color:var(--muted)">v0.7</span></b><small id="stamp">Loading…</small></div>
   </div>
   <button id="refresh" type="button" class="btn">Refresh</button>
   <button id="menuBtn" type="button" class="menu" aria-label="Settings" aria-expanded="false"><span></span><span></span><span></span></button>
@@ -384,8 +384,13 @@ body:not(.geek) .mapwrap{height:calc(100dvh - var(--dock,70px) - 84px);min-heigh
     </section>
 
     <section class="panel">
-      <div class="ph"><h2>Total rain</h2></div>
+      <div class="ph"><h2>Map &amp; total rain</h2></div>
       <div class="pb set">
+        <div class="field">
+          <label class="fl" for="areaSel">Map area</label>
+          <select id="areaSel"><option value="10">10 km around</option><option value="20">20 km around</option><option value="40">40 km around</option></select>
+          <span class="fd">How far the map reaches around Here or Home. Smaller means fewer forecast requests.</span>
+        </div>
         <div class="field">
           <label class="fl" for="fromSel2">Total rain counts from</label>
           <select id="fromSel2"></select>
@@ -434,7 +439,7 @@ const $$ = s => document.querySelectorAll(s);
 const LS = 'rainwatch.v1';
 const REFRESH_MS = 15 * 60e3, COOLDOWN_MS = 60 * 60e3, SLOTS = 96, STEP = 900, GRID_N = 7;
 const WET_SLOT_MM = 0.1, WET_PERIOD_MM = 0.2;
-const DEFAULTS = {mode:'human', threshold:50, home:{lat:31.973, lon:34.7925}, notif:{}, hours:3, tab:'data', fromHour:0, grid:'rate', sky:'off', scope:'point'};
+const DEFAULTS = {mode:'human', area:20, threshold:50, home:{lat:31.973, lon:34.7925}, notif:{}, hours:3, tab:'data', fromHour:0, grid:'rate', sky:'off', scope:'point'};
 const NAMES = {here:'Here', home:'Home'};
 const RADIUS = 10;  /* km, fixed */
 const LEVEL_TEXT = {good:'Dry', warn:'Possible', bad:'Rain likely'};
@@ -454,6 +459,7 @@ const data = {here:null, home:null};
 function load(){
   try { const s = JSON.parse(localStorage.getItem(LS) || '{}');
     if (s.sky === 'clouds') s.sky = 'off';
+    if (![10, 20, 40].includes(s.area)) s.area = 20;
     s.mode = s.mode === 'geek' ? 'geek' : 'human'; if (s.grid === 'cloud') s.grid = 'rate';
     if (s.grid === 'off') s.grid = 'rate';
     return {...DEFAULTS, ...s, home:{...DEFAULTS.home, ...(s.home||{})}, notif:{...(s.notif||{})}}; }
@@ -753,15 +759,15 @@ function renderSlot(){ renderTimeline(); renderStats(); drawGrid(); }
 function renderAll(){ renderTimeline(); renderStats(); drawArea(); syncHomeBox(); }
 
 let busy = false, again = false;
-async function loadOne(id, posFn){
-  try { const c = await posFn(); const pts = samplePoints(c, RADIUS); const ds = await getForecast(pts); data[id] = {ds, pts, c}; }
+async function loadOne(id, posFn, full = true){
+  try { const c = await posFn(); const pts = full ? samplePoints(c, RADIUS) : [{lat:c.lat, lon:c.lon, dx:0, dy:0}]; const ds = await getForecast(pts); data[id] = {ds, pts, c, partial:!full}; }
   catch (e) { data[id] = {error:e.message || 'Could not load forecast'}; }
 }
 async function refresh(){
   if (busy){ again = true; return; }
   busy = true; lastRefresh = Date.now();
   $('#stamp').textContent = 'Updating…';
-  await Promise.all([loadOne('here', () => getHere(false)), loadOne('home', async () => cfg.home)]);
+  await Promise.all([loadOne('here', () => getHere(false), sel.loc === 'here'), loadOne('home', async () => cfg.home, sel.loc === 'home')]);
   const r = data[sel.loc];
   if (!slotTouched && sel.day === 0 && r && r.ds) sel.slot = nowSlot(r.ds[0]);
   renderAll(); handleAlerts();
@@ -794,9 +800,11 @@ $$('[data-day]').forEach(b => b.addEventListener('click', () => {
   if (sel.day === 0 && r && r.ds){ sel.slot = nowSlot(r.ds[0]); slotTouched = false; }
   renderSlot();
 }));
-$$('[data-loc]').forEach(b => b.addEventListener('click', () => {
+$$('[data-loc]').forEach(b => b.addEventListener('click', async () => {
   sel.loc = b.dataset.loc;
   $$('[data-loc]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  const d = data[sel.loc];
+  if (d && d.partial){ const loc = sel.loc; await loadOne(loc, async () => d.c, true); if (sel.loc !== loc) return; }
   renderTimeline(); renderStats(); drawArea(true);
 }));
 function setTab(t){
@@ -804,7 +812,7 @@ function setTab(t){
   $('#menuBtn').setAttribute('aria-expanded', String(t === 'settings'));
   $('#view-data').hidden = t !== 'data';
   $('#view-settings').hidden = t !== 'settings';
-  if (t === 'data'){ if (!map) initMap(); else { map.invalidateSize(); } }
+  if (t === 'data'){ if (!map) initMap(); else { map.invalidateSize(); if (areaDirty){ areaDirty = false; setTimeout(() => drawArea(true), 60); } } }
 }
 $('#menuBtn').addEventListener('click', () => setTab(cfg.tab === 'settings' ? 'data' : 'settings'));
 $('#setClose').addEventListener('click', () => setTab('data'));
@@ -835,6 +843,8 @@ function applyMode(){
   sizeDock();
   if (map) setTimeout(() => { map.invalidateSize(); drawArea(true); drawGrid(); }, 60);
 }
+let areaDirty = false;
+$('#areaSel').addEventListener('change', e => { cfg.area = +e.target.value; save(); areaFitted = false; areaDirty = true; });
 $('#geekTog').addEventListener('change', e => { cfg.mode = e.target.checked ? 'geek' : 'human'; save(); applyMode(); });
 
 function syncHomeBox(){ $('#homeBox').textContent = cfg.home.lat.toFixed(5) + ', ' + cfg.home.lon.toFixed(5); }
@@ -847,7 +857,7 @@ function setHome(lat, lon){
 }
 function syncSettings(){
   $('#thr').value = cfg.threshold; $('#thrVal').textContent = cfg.threshold + '%';
-  syncHomeBox(); $('#geekTog').checked = cfg.mode === 'geek';
+  syncHomeBox(); $('#geekTog').checked = cfg.mode === 'geek'; $('#areaSel').value = areaKm();
   const n = $('#notifNote'), b = $('#notifBtn');
   if (!('Notification' in window)){ b.hidden = true; n.textContent = 'No notification support in this browser. Alerts show at the top of the page.'; return; }
   if (Notification.permission === 'granted'){ b.hidden = true; n.textContent = 'Notifications on. Keep this page open (a pinned tab works).'; }
@@ -906,9 +916,9 @@ function initMap(){
   map.on('mousemove', showVal);
   map.on('mouseout', () => { hv.hidden = true; });
   map.on('click', e => { if (placing){ setPlacing(false); setHome(e.latlng.lat, e.latlng.lng); } else showVal(e); });
-  map.on('moveend', scheduleView);
+  map.on('resize', limitMap);
   drawHome(); drawMe(); drawArea(true);
-  syncLayerButtons(); buildFrames(); loadView(true);
+  syncLayerButtons(); buildFrames();
 }
 function drawHome(){
   if (!map) return;
@@ -934,7 +944,17 @@ function drawMe(){
   if (sel.loc === 'here') drawArea();
 }
 /* ---------- map: forecast field over the visible map (no radius) ---------- */
-const VIEW_N = 6;            /* 6x6 forecast points across the view */
+let VIEW_N = 6;              /* NxN forecast points across the map area */
+const areaKm = () => cfg.area || 20;
+const areaGrid = () => ({10:4, 20:6, 40:7})[areaKm()] || 6;
+function areaBounds(c){ const k = areaKm(), dLat = k / 111.32, dLon = k / (111.32 * Math.cos(c.lat * Math.PI / 180)); return L.latLngBounds([c.lat - dLat, c.lon - dLon], [c.lat + dLat, c.lon + dLon]); }
+let areaB = null;
+function limitMap(){
+  if (!areaB || !map) return;
+  map.setMinZoom(0);  /* getBoundsZoom is clamped by the current minZoom */
+  map.setMaxBounds(areaB.pad(0.15));
+  map.setMinZoom(map.getBoundsZoom(areaB.pad(0.15), true));
+}
 let view = null, viewToken = 0, viewTimer = null, lastViewFetch = 0;
 let areaCircle = null;
 function drawArea(fit){
@@ -942,7 +962,10 @@ function drawArea(fit){
   const d = data[sel.loc], c = (d && d.c) || centerOf(sel.loc);
   if (areaCircle){ map.removeLayer(areaCircle); areaCircle = null; }
   if (c){
-    /* radius of interest: outline only, the colors cover the whole map */
+    /* the map is limited to the selected place: area of +/- areaKm around it */
+    areaB = areaBounds(c);
+    limitMap();
+    /* radius of interest: outline only */
     areaCircle = L.circle([c.lat, c.lon], {radius:RADIUS * 1000, color:'#0a62c9', weight:2, dashArray:'6 6', fill:false, interactive:false, pane:'area'}).addTo(map);
     if (fit || !areaFitted){
       areaFitted = true;
@@ -950,35 +973,29 @@ function drawArea(fit){
       map.fitBounds(areaCircle.getBounds(), {paddingTopLeft:[40, topPad], paddingBottomRight:[40, bottom]});
     }
   }
-  drawGrid();
+  loadView(false); drawGrid();
 }
-function viewCovers(){
-  if (!view) return false;
-  const b = map.getBounds();
-  return view.bounds.contains(b) && Math.abs(map.getZoom() - view.zoom) < 1.5;
-}
+function viewKey(c){ return [c.lat.toFixed(3), c.lon.toFixed(3), areaKm()].join(); }
+function viewCovers(c){ return !!view && view.key === viewKey(c); }
 const viewCache = new Map();
 async function loadView(force){
-  if (!map || $('#view-data').hidden) return;
-  if (!force && viewCovers()) return;
-  const token = ++viewToken;
-  const b0 = map.getBounds().pad(0.2);
-  /* snap the area to a coarse grid so panning back to the same place reuses cached data */
-  let S = b0.getSouth(), N = b0.getNorth(), W = b0.getWest(), E = b0.getEast();
-  const stp = 2 ** Math.round(Math.log2(Math.max(N - S, E - W) / 8));
-  S = Math.floor(S / stp) * stp; N = Math.ceil(N / stp) * stp; W = Math.floor(W / stp) * stp; E = Math.ceil(E / stp) * stp;
-  const b = L.latLngBounds([S, W], [N, E]), vkey = [S, N, W, E].map(x => x.toFixed(3)).join();
+  if (!map) return;
+  const c = (data[sel.loc] && data[sel.loc].c) || centerOf(sel.loc); if (!c) return;
+  if (!force && viewCovers(c)) return;
+  const token = ++viewToken, vkey = viewKey(c), n = areaGrid();
+  const b = areaBounds(c).pad(0.2), S = b.getSouth(), N = b.getNorth(), W = b.getWest(), E = b.getEast();
   const pts = [];
-  for (let j = 0; j < VIEW_N; j++) for (let i = 0; i < VIEW_N; i++)
-    pts.push({lat:S + (N - S) * j / (VIEW_N - 1), lon:W + (E - W) * i / (VIEW_N - 1), i, j});
-  $('#gsum').textContent = 'Loading forecast for this view…';
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++)
+    pts.push({lat:S + (N - S) * j / (n - 1), lon:W + (E - W) * i / (n - 1), i, j});
+  $('#gsum').textContent = 'Loading forecast for this area…';
   try {
     const hit = !force && viewCache.get(vkey);
     const ds = hit && Date.now() - hit.t < REFRESH_MS ? hit.ds : await getForecast(pts);
     if (token !== viewToken) return;
     viewCache.set(vkey, {ds, t:(hit && ds === hit.ds) ? hit.t : Date.now()});
-    if (viewCache.size > 12) viewCache.delete(viewCache.keys().next().value);
-    view = {ds, pts, S, N, W, E, bounds:b, zoom:map.getZoom()};
+    if (viewCache.size > 6) viewCache.delete(viewCache.keys().next().value);
+    VIEW_N = n;
+    view = {ds, pts, S, N, W, E, bounds:b, key:vkey};
     lastViewFetch = Date.now();
   } catch (e) {
     if (token !== viewToken) return;
@@ -986,7 +1003,6 @@ async function loadView(force){
   }
   drawGrid();
 }
-function scheduleView(){ clearTimeout(viewTimer); viewTimer = setTimeout(() => loadView(false), 700); }
 
 /* ---------- smooth field rendering ---------- */
 const fieldCanvas = document.createElement('canvas');
@@ -1123,7 +1139,7 @@ function drawGrid(){
   $('#fromWrap').hidden = cfg.grid !== 'total';
   renderScale();
   const sum = $('#gsum');
-  if (!view){ clearField(); sum.textContent = 'Loading forecast for this view…'; loadView(true); return; }
+  if (!view){ clearField(); sum.textContent = 'Loading forecast for this area…'; loadView(false); return; }
   const g = viewValues(), sc = cfg.grid, fval = v => fvalOf(sc, v);
   if (!g.vals){ clearField(); sum.textContent = 'Move the slider past ' + hLabel(cfg.fromHour) + ' to see the total.'; return; }
   renderField(g.vals, sc);
