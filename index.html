@@ -177,6 +177,7 @@ body{padding-bottom:calc(var(--dock, 70px) + 20px)}
 .mapwrap{position:relative;margin-top:14px;height:min(72vh,680px);min-height:460px;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);background:var(--panel-2)}
 #map{position:absolute;inset:0;isolation:isolate}
 #map.placing{cursor:crosshair}
+#map.placing .leaflet-grid-pane,#map.placing .leaflet-area-pane,#map.placing .wet-pin,#map.placing .cval{display:none !important}
 .mo{position:absolute;z-index:1000;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .mo-tl{top:12px;left:12px;flex-direction:column;align-items:flex-start}
 .mo-tr{top:12px;right:12px;justify-content:flex-end}
@@ -256,7 +257,7 @@ body:not(.geek) .mapwrap{height:calc(100dvh - var(--dock,70px) - 84px);min-heigh
 <header class="top">
   <div class="brand">
     <svg viewBox="-4 -6 68 52" aria-hidden="true"><g stroke-linecap="round" stroke-linejoin="round"><path d="M12 35 L58 22" stroke="#6b4a1e" stroke-width="3" fill="none"/><path d="M13 31.5 C6 26 -1 29 -3 38 C3 41 9 40 15 37 Z" fill="#d0a03a"/><path d="M12 33 L-1 35 M12 35 L-2 38 M13 36.5 L1 40" stroke="#8a6416" stroke-width=".9" fill="none"/><path d="M12.5 31.5 L15.5 37.5" stroke="#3a2a14" stroke-width="2.6" fill="none"/><path d="M30 30 C21 28 14 33 8 29 C14 38 25 38 33 34 Z" fill="#7a5cc4" stroke="none"/><path d="M31 36 L33 43 L38 44" stroke="#2a1d4a" stroke-width="3.4" fill="none"/><path d="M28 32 C27 22 33 17 39 18 C44 19 45 26 44 31 Z" fill="#4b2f86"/><path d="M41 24 L49 26" stroke="#4b2f86" stroke-width="3" fill="none"/><circle cx="50" cy="26.4" r="1.7" fill="#f1c9a5" stroke="none"/><path d="M36 11 C30 10 26 14 22 20 C28 18 32 18 37 17 Z" fill="#b5541c" stroke="none"/><circle cx="41" cy="13.2" r="5.2" fill="#f4cfae" stroke="none"/><circle cx="43.2" cy="12.6" r=".9" fill="#241b3d" stroke="none"/><path d="M45.5 14 L48 16.4 L45.2 16.2" fill="#f4cfae" stroke="#e3b896" stroke-width=".5"/><ellipse cx="41" cy="8.6" rx="10" ry="2.3" fill="#241b3d" stroke="none"/><path d="M33.2 8.4 C34.5 2 39 -1.5 47 -5 C44 -2 44.5 3 48.6 8.4 Z" fill="#241b3d" stroke="none"/><path d="M33.6 6.6 C37 7.8 44 7.8 48 6.4" stroke="#d0a03a" stroke-width="1.6" fill="none"/></g></svg>
-    <div><b>Rain Witch <span style="font:500 .65rem var(--mono);color:var(--muted)">v0.7</span></b><small id="stamp">Loading…</small></div>
+    <div><b>Rain Witch <span style="font:500 .65rem var(--mono);color:var(--muted)">v0.8</span></b><small id="stamp">Loading…</small></div>
   </div>
   <button id="refresh" type="button" class="btn">Refresh</button>
   <button id="menuBtn" type="button" class="menu" aria-label="Settings" aria-expanded="false"><span></span><span></span><span></span></button>
@@ -852,7 +853,8 @@ function setHome(lat, lon){
   cfg.home = {lat:+lat.toFixed(5), lon:+lon.toFixed(5)};
   delete cfg.notif.home; save(); syncHomeBox(); drawHome();
   /* update home on its own, without waiting for the location fix */
-  data.home = null; if (sel.loc === 'home'){ drawArea(); }
+  data.home = null;
+  if (sel.loc !== 'home') $('[data-loc="home"]').click(); else drawArea(true);
   loadOne('home', async () => cfg.home).then(() => { renderAll(); handleAlerts(); });
 }
 function syncSettings(){
@@ -1184,6 +1186,13 @@ function setPlacing(on){
   placing = on;
   $('#placeHint').hidden = !on;
   const m = document.getElementById('map'); if (m) m.classList.toggle('placing', on);
+  if (!map) return;
+  if (on){            /* free the map: no area limit, no graphics, until released */
+    map.setMaxBounds(null); map.setMinZoom(3); $('#hoverVal').hidden = true;
+    if (typeof frames !== 'undefined') frames.forEach(f => f.layer.setOpacity(0));
+  } else {
+    limitMap(); if (cfg.sky === 'radar') buildFrames();
+  }
 }
 function syncLayerButtons(){
   $$('[data-grid]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.grid === cfg.grid)));
@@ -1251,7 +1260,7 @@ function setFs(on){
 }
 $('#mapFs').addEventListener('click', () => setFs(!$('#mapwrap').classList.contains('fs')));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#mapwrap').classList.contains('fs')) setFs(false); });
-$('#mapHome').addEventListener('click', () => { if (map) setPlacing(!placing); });
+$('#mapHome').addEventListener('click', () => { if (!map) return; if (placing){ setPlacing(false); drawArea(true); } else setPlacing(true); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && placing) setPlacing(false); });
 
 /* ---------- start ---------- */
